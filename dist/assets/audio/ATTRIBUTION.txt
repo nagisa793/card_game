@@ -1,0 +1,7 @@
+DUEL ARENA BGM: two original four-channel 8-bit compositions.
+Standby: 100 BPM, 40 bars, 96 seconds. A marching pulse builds tension.
+Battle: 160 BPM, 64 bars, 96 seconds. A distinct full-speed duel theme.
+Each track has one pulse lead, one pulse counterpoint, a triangle bass,
+and one noise/percussion channel. All waveforms and note sequences are
+created for this simulator by scripts/compose_8bit_duel.py.
+No samples, external recordings, or existing compositions are used.

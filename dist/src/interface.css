@@ -1,0 +1,406 @@
+:root{--gold:#c5b17b;--ink:#0c1319;--line:#ffffff20;}
+html,body{width:100%;height:100%;overflow:hidden;}
+body{padding:0;background:#070f14;color:#ecf2f0;font-family:'Hiragino Kaku Gothic ProN','Yu Gothic',sans-serif;}
+button{font-family:inherit;}
+.top-bar{height:60px;min-height:60px;margin:0;padding:0 18px;border:0;border-bottom:1px solid #c5b17b40;border-radius:0;background:linear-gradient(90deg,#121f26,#09131a);box-shadow:none;flex-wrap:nowrap;}
+.brand{color:#eee5ce;text-decoration:none;letter-spacing:.18em;font-size:17px;font-weight:500;white-space:nowrap;}.brand>span{color:#d3bd80;font-size:28px;vertical-align:-2px;}.brand small{display:block;margin-left:34px;font-size:7px;letter-spacing:.25em;color:#829b9f;}
+.top-bar>div{gap:5px;flex-wrap:nowrap;}#scoreText{display:none;}
+#rulesBtn,#startBtn,#comStartBtn,#autoStartBtn{padding:7px 11px;font-size:11px;border-color:#a4b7b133;box-shadow:none;}#comStartBtn{background:#315b58;border-color:#75b2a3;}#autoStartBtn{background:#514168;border-color:#9886bb;}#startBtn{background:#23313a;}#rulesBtn{background:#2c3145;}
+#chainToggleBtn{display:none}.utilityBtn,.historyBtn{font-size:10px;background:transparent;border-color:#ffffff18;padding:5px 8px;}
+.metaBar{height:32px;margin:0;padding:0 16px;border-bottom:1px solid #ffffff0c;background:#0e181f;}.deckRule{margin-left:auto;font-size:9px;opacity:.55;}#phaseBanner{background:none;border:0;box-shadow:none;padding:0;color:#b9d7d2;font-size:11px;font-weight:600;}
+.battleLayout{display:grid;grid-template-columns:184px minmax(0,1fr) 296px;gap:0;height:calc(100dvh - 142px);min-height:0;}
+.stage,body.chainRailCollapsed .stage,.stage:has(#ownSelectedTacticPreview:not([hidden])){min-height:0;height:100%;overflow:hidden;padding:0;border:0;border-radius:0;background:radial-gradient(ellipse at center,#4a5a51,#152c30 65%,#0b161e);box-shadow:inset 0 0 90px #0009;}
+#sceneViewport{position:absolute;inset:50px 0 86px;z-index:1;}#sceneCanvas{display:block;width:100%;height:100%;touch-action:none;outline:none;}#worldLabels{position:absolute;inset:0;pointer-events:none;overflow:hidden;}
+#boardCardPreview{position:absolute;z-index:6;right:1.5%;top:50%;width:clamp(108px,16%,178px);transform:translateY(-50%);pointer-events:none;filter:drop-shadow(0 12px 18px #000b);}
+#boardCardPreview img{display:block;width:100%;height:auto;aspect-ratio:384 / 538;object-fit:contain;border:1px solid #d6c993b5;border-radius:4px;box-shadow:0 0 0 4px #09131acf,0 0 24px #94b5b055;}
+.decisionPanel{position:fixed;z-index:25;left:var(--decision-x);top:var(--decision-y);width:var(--decision-width);max-height:var(--decision-height);transform:translate(-50%,-50%);display:flex;flex-direction:column;overflow:hidden;border:1px solid #91b8adbd;border-radius:8px;background:#10222aeF;box-shadow:0 14px 40px #000c,0 0 0 1px #d1dac333;backdrop-filter:blur(9px);color:#e9f2ee;}
+.decisionPanelHeader{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 9px;border-bottom:1px solid #a9c4ba42;font-size:11px;flex-shrink:0;}
+.decisionPeekButton{padding:5px 10px;border:1px solid #a5c8c08c;border-radius:4px;background:#24444b;color:#effaf5;cursor:pointer;white-space:nowrap;font-size:11px;}
+.decisionPeekButton:focus-visible{outline:2px solid #cdfcff;outline-offset:2px;}
+.decisionBody{min-height:0;overflow:auto;padding:5px 8px 8px;scrollbar-width:thin;}
+.decisionPanel .activeDecision{position:static;z-index:auto;margin:0;padding:0;border:0;background:none;box-shadow:none;}
+.decisionPanel .activeActionGrid{grid-template-columns:repeat(2,minmax(0,1fr));}
+.decisionPanel.peeked{width:auto;max-width:calc(100vw - 24px);}
+.decisionPanel.peeked .decisionPanelHeader{border-bottom:0;}
+.decisionPanel.peeked .decisionPanelHeader strong{display:none;}
+.worldLabel{position:absolute;transform:translate(-50%,-50%);white-space:nowrap;text-align:center;color:#e8f4f1;text-shadow:0 2px 4px #000,0 0 5px #000;font-size:10px;line-height:1.25;pointer-events:none;}
+.worldLabel .level{font-size:19px;font-weight:800;color:#c9f3ec;}.worldLabel .fieldName{font-size:9px;color:#fff;display:block;}.worldLabel small{font-size:8px;opacity:.75;}.worldLabel.selected{color:#a7ffd5;}.worldLabel.pileLabel{font-size:9px;background:#0c171bc9;padding:3px 5px;border:1px solid #e2dcc133;border-radius:2px;}
+.arenaSignature{position:absolute;left:18px;top:14px;z-index:5;font-size:9px;letter-spacing:.21em;color:#e8e1c090;pointer-events:none;}.arenaSignature span{display:block;font-size:7px;margin-top:4px;color:#a2b5b9;letter-spacing:.12em;}
+.half,.half.own,.half.opp,.half.attackingSide{position:static;padding:0;background:none;box-shadow:none;transition:none;}
+/* DOM remains the rules engine's accessible interaction model; meshes are the visible board. */
+.zoneRow{position:absolute!important;left:-10000px!important;width:450px;visibility:hidden;pointer-events:none;}.midline{display:none;}
+#oppHandLabel,#ownHandLabel{position:absolute;z-index:3;font-size:9px;letter-spacing:.04em;padding:0;margin:0;color:#b7cbc8;left:50%;transform:translateX(-50%);white-space:nowrap;}#oppHandLabel{top:5px;}#ownHandLabel{bottom:79px;}
+#oppHand,#ownHand{position:absolute;z-index:4;display:flex;justify-content:safe center;gap:5px;left:12%;width:76%;padding:4px 4px 7px;background:none;overflow-x:auto;overflow-y:hidden;min-height:0;}
+#oppHand{top:18px;}#ownHand{bottom:0;}
+#oppHand .card,#oppHand .cardBack{width:33px;min-width:33px;height:46px;aspect-ratio:auto;font-size:6px;}#oppHand .cardMiniType,#oppHand .cardSigil,#oppHand .cardMiniStat{display:none;}#oppHand .cardMiniName{font-size:7px;}
+#ownHand .card{width:50px;min-width:50px;height:70px;aspect-ratio:auto;border-width:1px;box-shadow:0 4px 12px #000b;padding:3px;}.cardSigil{flex:1;min-height:12px;}#ownHand .cardMiniName{font-size:8px;-webkit-line-clamp:2;}#ownHand .cardMiniType{font-size:6px;}
+.handRow .card.type-character[data-art-loaded]{background-image:linear-gradient(180deg,#10141a80,#10141a00 32%,#10141a00 57%,#10141ae8),var(--character-art)!important;background-size:cover!important;background-position:center!important;color:#fff!important;}
+.handRow .card.type-character[data-art-loaded] .cardSigil{visibility:hidden;}
+.handRow .card.type-character[data-art-loaded] .cardMiniName,.handRow .card.type-character[data-art-loaded] .cardMiniStat,.handRow .card.type-character[data-art-loaded] .cardMiniType{text-shadow:0 1px 4px #000,0 0 3px #000;color:#fff;}
+#ownSelectedTacticPreview{position:absolute;bottom:85px;left:20%;width:60%;z-index:4;border:1px solid #badad355;background:#0a192beF;padding:4px;}#ownSelectedTacticPreview .label{font-size:8px;}.selectedTacticPreview .handRow .card{width:31px;min-width:31px;height:43px;}.selectedTacticPreview .cardMiniType,.selectedTacticPreview .cardSigil{display:none;}.selectedTacticPreview .cardMiniName{font-size:6px;}
+.chainHistoryPanel{position:relative;height:100%;width:auto;margin:0;padding:0 10px 10px;border:0;border-right:1px solid var(--line);border-radius:0;background:linear-gradient(180deg,#13212c,#09131bec);overflow:hidden;display:flex;flex-direction:column;gap:12px;}
+.chainHistoryPanel .chainTitle{position:static;background:transparent;padding:10px 0;margin:0 0 8px;border-color:#ffffff19;font-size:10px;}.chainOrder{font-size:7px;}
+#chainPanel{flex:1;min-height:0;overflow:auto;scrollbar-width:thin;}.chainHistoryPanel .chainItem{padding:7px;margin-bottom:11px;font-size:8px;}.chainHistoryPanel .chainCardName{font-size:10px;}.chainHistoryPanel .chainTarget{font-size:8px;}
+.activeFlowRail{position:static!important;inset:auto!important;width:auto!important;flex:0 1 43%;min-height:70px;display:flex;gap:5px;overflow:hidden;padding-top:12px;}.activeChainStack{padding:0;border:0;background:none;}.activeChainEmpty{padding:5px 0;font-size:9px;color:#7a929c;}.activeFlowRail .flowMode{background:#22444e;border:1px solid #52767b;}.activeFlowRail .resolutionBanner{font-size:9px;background:#343122;border-color:#ab9865;}
+.sideColumn{display:flex;flex-direction:column;gap:0;min-height:0;background:#0d1821;border-left:1px solid var(--line);}
+.cardInspector.cardInfoRail{position:relative;inset:auto;display:grid;grid-template-columns:72px 1fr;gap:7px 10px;width:auto;height:148px;min-height:148px;padding:12px;border:0;border-bottom:1px solid var(--line);border-radius:0;background:linear-gradient(140deg,#233039,#111b25);overflow:hidden;}
+.inspectorHeading{grid-column:1/-1;margin:0;font-size:8px;letter-spacing:.17em;}.cardInfoRail .inspectorCard{width:68px;aspect-ratio:1 / 1.4;margin:0;padding:5px;grid-column:1;grid-row:2 / 4;transform:none;}.inspectorType{font-size:6px;}.inspectorName{font-size:9px;}.cardInfoRail .inspectorEffect{font-size:10px;line-height:1.6;max-height:106px;overflow:auto;grid-column:2;grid-row:2/4;}.inspectorHint{display:none;}
+.status{padding:9px 12px;font-size:11px;line-height:1.5;border:0;border-bottom:1px solid #ffffff17;border-radius:0;background:#172933;flex-shrink:0;color:#c9e2de;}
+.controls{flex:1;min-height:0;padding:11px;border:0;border-radius:0;background:transparent;overflow-y:auto;scrollbar-width:thin;}.controlsTitle{font-size:10px;font-weight:700;letter-spacing:.15em;color:#b3c8c7;margin-bottom:8px;}.controlsText{font-size:11px;line-height:1.55;color:#afc3c8;}.controlBtn{padding:7px 8px;margin:2px;font-size:10px;line-height:1.4;min-height:30px;}.controlBtn.primary{background:linear-gradient(120deg,#34776f,#254d4c);border-color:#76b9a5;}.controlBtn.danger{color:#ffc1c9;border-color:#8c4c5b;background:#492b36;}.controlBtn:disabled{opacity:.35;}.controlBtn.type-tactic,.controlBtn.type-trap,.controlBtn.type-exp,.controlBtn.type-character{border-width:1px;box-shadow:none;}.choiceSection{padding:6px;margin:6px 0;border-color:#ffffff18;}
+.historyArea{height:50px;margin:0;padding:4px 14px;border:0;border-top:1px solid var(--line);border-radius:0;background:#09131b;}.historyTitle{font-size:8px;color:#95aeaf;}.log{height:28px;max-height:28px;font-size:9px;padding:3px 0;border:0;background:none;}footer{display:none;}
+body.historyCollapsed .battleLayout{height:calc(100dvh - 116px);}body.historyCollapsed .historyArea{height:24px;}
+#welcome{position:absolute;z-index:6;left:50%;top:50%;width:430px;max-width:85%;transform:translate(-50%,-50%);padding:36px 28px;color:#fff;text-align:center;background:linear-gradient(140deg,#091821dc,#15262bdc);border:1px solid #c8ba8566;box-shadow:0 20px 60px #0008;backdrop-filter:blur(9px);}
+#welcome[hidden]{display:none;}#welcome .eyebrow{font-size:9px;letter-spacing:.3em;color:#d2c393;}#welcome h2{font-size:25px;letter-spacing:.08em;font-weight:500;margin:20px 0;}#welcome p{font-size:12px;color:#bdcccb;line-height:1.9;}#welcome>div:last-of-type{display:flex;gap:8px;margin-top:24px;}#welcome button{cursor:pointer;padding:12px 15px;border:1px solid #b4c6b677;background:#244a48;color:#eaffef;flex:1;font-size:12px;}#welcome button:last-child{background:#15222c;color:#d4ddde;}#welcome small{display:block;font-size:9px;color:#8a9ea1;margin-top:16px;}
+#arenaNotice{position:absolute;z-index:8;left:10%;right:10%;top:30%;padding:20px;background:#132633;color:#e8f5ed;border:1px solid #8daab3;}
+.rulesDialog{background:#eff3f0;}.settingsDialog{background:#14232c;}select{background:#203c48;color:white;border:1px solid #587482;padding:5px;}
+@media(min-width:1700px) and (min-height:900px){.battleLayout{grid-template-columns:210px minmax(0,1fr) 330px;}.cardInspector.cardInfoRail{height:180px;min-height:180px;grid-template-columns:90px 1fr;}.cardInfoRail .inspectorCard{width:85px;}.cardInfoRail .inspectorEffect{max-height:130px;font-size:12px;}.controlsText{font-size:13px;}.controlBtn{font-size:12px;padding:9px;}.worldLabel .level{font-size:23px;}#ownHand .card{width:60px;min-width:60px;height:84px;}#ownHandLabel{bottom:94px;}#sceneViewport{bottom:105px;}}
+@media(max-width:1100px){.battleLayout{grid-template-columns:150px minmax(0,1fr) 255px;}.top-bar{padding:0 8px;}.brand{font-size:12px;}.brand small{font-size:6px;}#startBtn,#comStartBtn,#autoStartBtn,#rulesBtn{font-size:9px;padding:7px;}.historyControls{display:none;}.cardInspector.cardInfoRail{height:135px;min-height:135px;padding:8px;}}
+@media(max-width:760px){.top-bar{height:78px;flex-wrap:wrap;}.top-bar>div{width:100%;overflow:auto;}.brand{font-size:13px;}.brand small{display:none;}.metaBar{height:28px;}.deckRule{display:none;}.battleLayout{height:calc(100dvh - 156px);grid-template-columns:minmax(0,1fr) 220px;}.chainHistoryPanel{display:none;}.cardInspector.cardInfoRail{display:grid;}#sceneViewport{inset:45px -20% 78px;}#ownHand,#oppHand{left:0;width:100%;}#ownHand .card{width:38px;min-width:38px;height:53px;}#ownHandLabel{bottom:61px;}.arenaSignature{display:none;}.worldLabel .fieldName{display:none;}.worldLabel .level{font-size:14px;}#welcome h2{font-size:18px;}#welcome{padding:18px 10px;}}
+.cardInfoRail .inspectorCard{background-size:cover;background-position:center;border:1px solid #e7dabb55;}.cardInfoRail .inspectorCard::before,.cardInfoRail .inspectorCard::after,.cardInfoRail .inspectorType,.cardInfoRail .inspectorName{display:none;}
+.chainHistoryPanel.collapsed{width:auto;max-height:none;min-height:0;padding:0 10px 10px;}.chainHistoryPanel.collapsed::after{display:none;}.chainHistoryPanel.collapsed #chainPanel{display:block!important;}
+.activeMode{box-shadow:inset 0 -2px #c3dacf!important;}#sceneCanvas:focus-visible{outline:2px solid #bfead9;}
+[hidden]{display:none!important;}
+#ownHandLabel,#oppHandLabel,.arenaSignature{display:none!important;}
+.sideColumn{position:relative;}
+#ownSelectedTacticPreview{position:absolute;z-index:12;inset:0 0 auto 0;width:auto;max-height:45%;padding:12px;background:#14252cf5;border:1px solid #9bbab87c;box-shadow:0 14px 30px #000b;overflow:auto;}
+#ownSelectedTacticPreview:not(.open){display:none!important;}
+#ownSelectedTacticPreview .label{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;font-size:12px;}
+#closeTacticPreviewBtn{padding:4px 9px;color:#e7f1ec;border:1px solid #a9c5c67a;background:#26444c;cursor:pointer;}
+#ownSelectedTacticPreview .handRow{display:flex;flex-wrap:wrap;gap:4px;}
+#welcome{padding:22px;max-width:90%;width:355px;}
+#welcome>div:last-of-type{margin:0;}
+@font-face{font-family:DuelSans;src:url('../assets/NotoSansJP.ttf') format('truetype');font-style:normal;font-weight:100 900;font-display:swap;}body,button{font-family:DuelSans,'Hiragino Kaku Gothic ProN',sans-serif;}
+.activeChainItem{position:relative;padding:7px 5px 7px 48px;min-height:65px;background:linear-gradient(120deg,#20353f,#13222c);border-color:#88a4a333;}.activeChainItem::before{content:'';position:absolute;left:5px;top:8px;width:35px;height:49px;background-image:var(--chain-art);background-size:cover;box-shadow:0 3px 7px #0008;border:1px solid #c7ba8a55;}.activeChainMeta{font-size:7px;}.activeChainName{font-size:9px;}.activeChainTarget{font-size:8px;}
+.openingCardGrid{grid-template-columns:repeat(4,minmax(0,1fr));gap:3px;}.openingCardGrid .controlBtn{min-height:28px;padding:3px 2px;margin:0;font-size:8px;line-height:1.18;}
+@media(max-width:760px){.battleLayout{display:block;height:calc(100dvh - 156px);overflow-y:auto;}.stage,body.chainRailCollapsed .stage,.stage:has(#ownSelectedTacticPreview:not([hidden])){height:max(420px,62dvh);min-height:420px;flex-shrink:0;}#sceneViewport{inset:38px 0 77px;}.sideColumn{height:410px;min-height:410px;border-left:0;border-top:1px solid var(--line);}.cardInspector.cardInfoRail{min-height:102px;height:102px;grid-template-columns:55px 1fr;}.cardInfoRail .inspectorCard{width:50px;}.cardInfoRail .inspectorEffect{max-height:66px;font-size:10px;}.controls{padding:9px;}.openingCardGrid{grid-template-columns:repeat(3,minmax(0,1fr));}}
+@media(max-width:760px){#boardCardPreview{right:4px;top:35%;width:min(25%,104px);} .decisionPanel{width:min(var(--decision-width),calc(100vw - 24px));}}
+
+/* Full viewport board: auxiliary panels sit within the arena. */
+#historyToggleBtn{display:none;}
+.battleLayout,body.historyCollapsed .battleLayout{display:block;height:calc(100dvh - 92px);min-height:0;}
+.stage,body.chainRailCollapsed .stage,.stage:has(#ownSelectedTacticPreview:not([hidden])){width:100%;height:100%;min-height:0;position:relative;}
+#sceneViewport{inset:0 0 82px;}
+#ownHand,#oppHand{left:22%;width:56%;}
+.chainHistoryPanel,.chainHistoryPanel.collapsed{position:absolute;z-index:8;left:9px;top:8%;bottom:102px;width:clamp(168px,15%,245px);height:auto;max-height:none;padding:9px 10px;display:flex;flex-direction:column;border:1px solid #80a7ab55;border-radius:8px;background:linear-gradient(180deg,#101d29dc,#0b1725b9);backdrop-filter:blur(5px);pointer-events:auto;}
+.selectionPanel{position:absolute;z-index:12;left:clamp(178px,16%,255px);top:8%;bottom:102px;width:clamp(170px,20%,280px);min-height:0;display:flex;flex-direction:column;overflow:hidden;border:1px solid #80a7ab77;border-radius:8px;background:linear-gradient(180deg,#101d29ed,#0b1725e8);box-shadow:0 10px 26px #0009;backdrop-filter:blur(6px);pointer-events:auto;}
+.selectionPanel[hidden]{display:none!important;}
+.selectionPanelTitle{flex:0 0 auto;padding:8px 9px;border-bottom:1px solid #ffffff22;color:#e8d69e;font-size:11px;font-weight:800;line-height:1.4;}
+.selectionPanelContent{min-height:0;overflow-y:auto;padding:4px;scrollbar-width:thin;}
+.selectionCardGrid{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;padding:3px;}
+.selectionCardGrid .selectionCard{position:relative;width:100%;min-width:0;height:auto;aspect-ratio:384/538;padding:3px;overflow:hidden;border:1px solid #c9b484;border-radius:4px;background:linear-gradient(145deg,#253c48,#101a25);color:#f5f1e6;white-space:normal;}
+.selectionCardGrid .selectionCard:hover{transform:none!important;box-shadow:0 4px 12px #000b!important;}
+.selectionCardGrid .selectionCard .cardMiniName{font-size:clamp(7px,1vw,10px);line-height:1.3;}
+.selectionCardGrid .selectionCard[aria-pressed="true"]{outline:2px solid #f1d89b;}
+.selectionPanelEmpty{padding:9px;color:#b9c9cb;font-size:10px;line-height:1.5;}
+.chainHistoryPanel #chainPanel,.chainHistoryPanel.collapsed #chainPanel{display:block!important;min-height:0;overflow-y:auto;}
+.activeFlowRail{display:flex;flex:0 0 auto;min-height:0;max-height:38%;padding:0 0 8px;border-bottom:1px solid #b0c5c044;overflow-y:auto;}
+.chainHistoryPanel .chainTitle{font-size:12px;}.chainHistoryPanel .chainCardName{font-size:11px;}.chainHistoryPanel .chainItem{font-size:10px;}
+.sideColumn{position:absolute;z-index:19;bottom:56px;right:11px;width:min(395px,36vw);min-height:0;max-height:53%;border:0;background:transparent;pointer-events:none;display:block;}
+.sideColumn>*{pointer-events:auto;}
+.cardInspector.cardInfoRail{position:absolute;width:1px;height:1px;min-height:0;padding:0;opacity:0;overflow:hidden;pointer-events:none;}
+.sideColumn .status{display:none;border:1px solid #8ab4b066;border-bottom:0;border-radius:8px 8px 0 0;background:#152633f5;max-height:70px;overflow:auto;}
+.sideColumn .controls{display:none;max-height:min(40vh,390px);min-height:80px;padding:12px;background:#10212def;border:1px solid #8ab4b066;border-radius:8px;box-shadow:0 10px 30px #000b;backdrop-filter:blur(9px);overflow-y:auto;}
+.stage[data-drawer="controls"] .sideColumn .controls,.stage[data-drawer="controls"] .sideColumn .status{display:block;}
+.stage[data-drawer="controls"] .sideColumn .status+.controls{border-radius:0 0 8px 8px;}
+.boardDock{position:absolute;z-index:22;right:12px;bottom:9px;display:flex;gap:7px;}
+.boardDock button{min-width:72px;min-height:39px;border:1px solid #96c7c2a3;border-radius:6px;background:linear-gradient(135deg,#294756eb,#101b2af2);color:#eaf5f2;font-weight:700;font-size:12px;cursor:pointer;box-shadow:0 4px 12px #000b;}
+.boardDock button[aria-expanded="true"]{background:#47746c;border-color:#ccece2;}
+.boardDock button:focus-visible{outline:2px solid #f4eec6;outline-offset:2px;}
+.historyArea,body.historyCollapsed .historyArea{position:absolute;z-index:20;right:11px;bottom:56px;width:min(395px,36vw);height:min(40vh,360px);margin:0;padding:12px;border:1px solid #8ab4b066;border-radius:8px;background:#10212def;box-shadow:0 10px 30px #000b;backdrop-filter:blur(9px);display:none;}
+.stage[data-drawer="history"] .historyArea{display:flex;flex-direction:column;}
+.historyArea .historyTitle{font-size:11px;flex:0 0 auto;}.historyArea .log{height:auto;max-height:none;flex:1;overflow-y:auto;font-size:11px;line-height:1.5;}
+#ownSelectedTacticPreview{position:absolute;z-index:18;left:27%;bottom:90px;width:46%;max-height:35%;}
+#boardCardPreview{position:absolute;z-index:10;right:1.5%;top:16%;width:min(28vw,440px);max-height:53%;transform:none;display:flex;align-items:center;gap:13px;padding:11px;border:1px solid #b9c8ac9e;border-radius:8px;background:linear-gradient(130deg,#122638ed,#0c1928eb);box-shadow:0 15px 38px #000c;backdrop-filter:blur(6px);filter:none;pointer-events:none;}
+#boardCardPreview img{flex:0 0 41%;width:41%;min-width:0;max-height:100%;object-fit:contain;box-shadow:0 3px 14px #000d;}
+.boardCardText{min-width:0;min-height:0;max-height:100%;overflow:auto;font-size:clamp(10px,1vw,14px);line-height:1.6;color:#e8edee;overflow-wrap:anywhere;}
+.boardCardText strong{display:block;color:#e9d497;margin-bottom:9px;font-size:1.1em;line-height:1.35;}
+.boardCardText p{margin:0;white-space:pre-wrap;}
+@media(max-width:760px){
+ .top-bar{height:78px;}.metaBar{height:28px;}.battleLayout,body.historyCollapsed .battleLayout{height:calc(100dvh - 106px);overflow:hidden;}
+ .stage,body.chainRailCollapsed .stage,.stage:has(#ownSelectedTacticPreview:not([hidden])){height:100%;min-height:0;}
+ #sceneViewport{inset:0 0 65px;}#ownHand,#oppHand{left:10%;width:80%;}
+ .chainHistoryPanel,.chainHistoryPanel.collapsed{top:10%;bottom:auto;left:4px;width:min(33%,160px);height:min(36%,280px);padding:5px;font-size:9px;}
+ .selectionPanel{left:min(calc(33vw + 10px),170px);top:10%;bottom:auto;width:min(48vw,205px);height:min(44%,350px);}
+ .selectionPanelTitle{padding:5px;font-size:9px;}.selectionCardGrid{gap:3px;padding:2px;}
+ .activeFlowRail{max-height:30%;}.chainHistoryPanel .chainTitle{font-size:9px;}.chainHistoryPanel .chainCardName{font-size:9px;}
+ #boardCardPreview{right:4px;top:10%;width:min(58%,300px);max-height:34%;padding:6px;gap:6px;}#boardCardPreview img{flex-basis:36%;width:36%;}.boardCardText{font-size:9px;}
+ .sideColumn,.historyArea,body.historyCollapsed .historyArea{width:min(94%,380px);max-height:52%;bottom:53px;right:4px;}.historyArea,body.historyCollapsed .historyArea{height:min(48vh,340px);}
+ .boardDock{right:5px;bottom:5px;}.boardDock button{min-height:38px;min-width:60px;}
+ #ownSelectedTacticPreview{left:5%;width:90%;bottom:70px;}
+}
+
+/* Let the board take the exact visible height left by the header. */
+html,body{overflow:hidden;max-width:100%;}
+body{height:var(--visible-height,100dvh);min-height:0;display:flex;flex-direction:column;}
+.top-bar{flex:0 0 60px;margin:0;min-height:0;}
+.metaBar{flex:0 0 32px;margin:0;min-height:0;}
+.battleLayout,body.historyCollapsed .battleLayout{flex:1 1 0;height:auto;min-height:0;overflow:hidden;}
+.stage,body.chainRailCollapsed .stage,.stage:has(#ownSelectedTacticPreview:not([hidden])){height:100%;min-height:0;}
+.boardDock{right:max(12px,env(safe-area-inset-right));bottom:max(10px,env(safe-area-inset-bottom));}
+#ownHand{bottom:0;height:105px;align-items:flex-end;padding:25px 8px 6px;overflow-x:auto;overflow-y:hidden;}
+#oppHand{top:0;height:82px;align-items:flex-start;padding:18px 8px 6px;overflow-x:auto;overflow-y:hidden;}
+#ownHand .card,#oppHand .card{position:relative;flex-shrink:0;transition:transform .17s ease-out,box-shadow .17s ease-out;}
+#ownHand .card:hover,#ownHand .card.handRaised,#ownHand .card.pointerHover,#oppHand .card:hover,#oppHand .card.handRaised,#oppHand .card.pointerHover{z-index:6;transform:translateY(-10px)!important;box-shadow:0 12px 20px #000c,0 0 0 2px #d3f6e6!important;}
+body.touchInput #ownHand .card:hover:not(.handRaised):not(.pointerHover),body.touchInput #oppHand .card:hover:not(.handRaised):not(.pointerHover){transform:none!important;box-shadow:0 4px 12px #000b!important;}
+#boardCardPreview{width:clamp(205px,25vw,345px);max-height:68%;top:11%;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:10px;padding:12px;}
+#boardCardPreview img{width:min(76%,190px);max-height:min(49%,270px);flex:0 1 auto;aspect-ratio:384 / 538;object-fit:contain;}
+.boardCardText{width:100%;max-height:49%;flex:0 1 auto;overflow-y:auto;overflow-wrap:anywhere;font-size:clamp(11px,1.05vw,14px);line-height:1.6;}
+.boardCardText strong{margin-bottom:5px;}
+@media(max-width:760px){
+ .top-bar{flex-basis:78px;}.metaBar{flex-basis:28px;}
+ .battleLayout,body.historyCollapsed .battleLayout{height:auto;min-height:0;}
+ .sideColumn{height:auto;min-height:0;border:0;background:transparent;}
+ #sceneViewport{bottom:70px;}
+ #ownHand{height:79px;padding-top:17px;padding-bottom:5px;}#oppHand{height:70px;padding-top:16px;}
+ #ownHand .card:hover,#ownHand .card.handRaised,#ownHand .card.pointerHover,#oppHand .card:hover,#oppHand .card.handRaised,#oppHand .card.pointerHover{transform:translateY(-7.5px)!important;}
+ #boardCardPreview{top:10%;right:5px;width:min(46vw,235px);max-height:48%;gap:4px;padding:7px;}
+ #boardCardPreview img{width:min(64%,110px);max-height:48%;}.boardCardText{max-height:50%;font-size:10px;line-height:1.35;}
+ .boardDock{right:max(5px,env(safe-area-inset-right));bottom:max(6px,env(safe-area-inset-bottom));}
+}
+
+/* Keep both information surfaces beyond the outer edge of the stone battlefield. */
+.chainHistoryPanel,.chainHistoryPanel.collapsed{
+ box-sizing:border-box;left:max(clamp(8px,1.2vw,22px),calc(var(--field-left-edge) - clamp(8px,1.2vw,22px) - 420px));right:auto;top:10%;bottom:92px;
+ width:min(420px,calc(var(--field-left-edge) - clamp(8px,1.2vw,22px) - clamp(8px,1.2vw,22px)));max-height:none;z-index:16;
+ background:linear-gradient(145deg,#0c1c2dee,#112434e5);border:1px solid #97c2c4a8;
+ box-shadow:0 14px 35px #000b,0 0 21px #72a6bc38;
+}
+#boardCardPreview{
+ box-sizing:border-box;left:calc(var(--field-right-edge) + clamp(8px,1.2vw,22px));right:clamp(8px,1.2vw,22px);top:10%;bottom:92px;
+ width:min(420px,calc(100% - var(--field-right-edge) - clamp(8px,1.2vw,22px) - clamp(8px,1.2vw,22px)));height:auto;max-height:none;overflow:hidden;z-index:17;
+ background:linear-gradient(145deg,#0d1e2ff2,#122936ec);border:1px solid #b9d0c5ad;
+ box-shadow:0 14px 35px #000b,0 0 21px #72a6bc38;
+}
+#boardCardPreview img{width:min(80%,220px);max-height:44%;}
+#boardCardPreview .boardCardText{flex:1 1 auto;max-height:none;min-height:0;overflow-y:auto;}
+@media(max-width:760px){
+ .chainHistoryPanel,.chainHistoryPanel.collapsed{top:9%;bottom:82px;padding:6px;}
+ #boardCardPreview{top:9%;bottom:82px;padding:7px;}
+ #boardCardPreview img{width:min(72%,120px);max-height:40%;}
+ #boardCardPreview .boardCardText{font-size:10px;line-height:1.4;}
+}
+
+/* Full-screen arena. HUD elements float over the world without framing the board. */
+html,body{width:100%;height:100%;overflow:hidden;}
+body{display:block;height:var(--visible-height,100dvh);min-height:0;margin:0;padding:0;}
+.top-bar{position:fixed;z-index:31;inset:0 0 auto;height:58px;min-height:58px;padding:0 14px;background:linear-gradient(180deg,#07111de6,#07111d78 72%,transparent);border:0;box-shadow:none;pointer-events:none;}
+.top-bar>*{pointer-events:auto}.top-bar>div{pointer-events:auto;gap:6px;}
+.metaBar{position:fixed;z-index:31;top:58px;left:14px;right:14px;height:24px;padding:0;background:transparent;border:0;pointer-events:none;}
+#phaseBanner{display:inline-block;padding:2px 0;color:#f0f4eb;text-shadow:0 2px 7px #000;font-size:11px;}
+.battleLayout,body.historyCollapsed .battleLayout{position:fixed;z-index:1;inset:0;display:block;width:100vw;height:var(--visible-height,100dvh);min-height:0;margin:0;padding:0;overflow:hidden;border:0;border-radius:0;background:transparent;}
+.stage,body.chainRailCollapsed .stage,.stage:has(#ownSelectedTacticPreview:not([hidden])){position:absolute;inset:0;width:100%;height:100%;min-height:0;margin:0;padding:0;overflow:hidden;border:0;border-radius:0;background:transparent;box-shadow:none;}
+#sceneViewport{inset:0!important;z-index:0;}
+#ownHand,#oppHand{left:20%;width:60%;}
+#oppHand{top:8%;}
+#ownHand{left:20%;width:60%;bottom:1.5%;}
+#oppHand .card,#oppHand .cardBack{width:33px;min-width:33px;height:46px;}
+#ownHand .card{width:50px;min-width:50px;height:70px;}
+.chainHistoryPanel,.chainHistoryPanel.collapsed{
+ box-sizing:border-box;position:absolute;z-index:16;top:18%;bottom:17%;height:auto;max-height:none;
+ left:max(clamp(8px,1.2vw,22px),calc(var(--field-left-edge) - clamp(8px,1.2vw,22px) - 420px));right:auto;
+ width:min(420px,calc(var(--field-left-edge) - clamp(8px,1.2vw,22px) - clamp(8px,1.2vw,22px)));
+ padding:10px;background:linear-gradient(145deg,#0c1c2df2,#112434ed);border:0;border-radius:0;box-shadow:none;backdrop-filter:blur(5px);
+}
+.chainHistoryPanel.collapsed{display:none!important;}
+.chainHistoryPanel #chainPanel,.chainHistoryPanel.collapsed #chainPanel{display:block!important;min-height:0;overflow-y:auto;}
+.activeFlowRail{max-height:34%;}
+#boardCardPreview{
+ box-sizing:border-box;left:calc(var(--field-right-edge) + clamp(8px,1.2vw,22px));right:clamp(8px,1.2vw,22px);
+ top:8%;bottom:auto;width:min(420px,calc(100% - var(--field-right-edge) - clamp(8px,1.2vw,22px) - clamp(8px,1.2vw,22px)));
+ height:min(44vh,520px);max-height:50%;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:8px;
+ padding:10px;background:linear-gradient(145deg,#0d1e2ff5,#122936f2);border:0;border-radius:0;box-shadow:none;backdrop-filter:blur(5px);filter:none;
+}
+#boardCardPreview img{width:min(76%,190px);max-height:39%;flex:0 1 auto;object-fit:contain;}
+#boardCardPreview .boardCardText{width:100%;min-height:0;max-height:none;flex:1 1 auto;overflow-y:auto;font-size:clamp(10px,1vw,14px);line-height:1.55;}
+.sideColumn{position:absolute;z-index:19;right:12px;bottom:58px;width:min(430px,44vw);height:auto;min-height:0;max-height:48vh;border:0;background:transparent;pointer-events:none;}
+.sideColumn>*{pointer-events:auto;}
+.sideColumn .status{display:none;max-height:68px;overflow:auto;border:0;background:#101d29ef;}
+.sideColumn .controls{display:none;max-height:36vh;min-height:80px;padding:10px;background:#101d29ef;border:0;border-radius:0;box-shadow:none;backdrop-filter:blur(7px);overflow-y:auto;}
+.stage[data-drawer="controls"] .sideColumn .controls,.stage[data-drawer="controls"] .sideColumn .status{display:block;}
+.stage[data-drawer="controls"] .sideColumn .status+.controls{border-radius:0;}
+.historyArea,.historyArea.collapsed{position:absolute;z-index:20;right:12px;bottom:58px;width:min(430px,44vw);height:min(40vh,380px);margin:0;padding:10px;border:0;border-radius:0;background:#101d29ef;box-shadow:none;backdrop-filter:blur(7px);display:none;}
+.stage[data-drawer="history"] .historyArea{display:flex;flex-direction:column;}
+.historyArea .historyTitle{font-size:11px;flex:0 0 auto;}.historyArea .log{height:auto;max-height:none;flex:1;overflow-y:auto;font-size:11px;line-height:1.5;}
+.boardDock{position:absolute;z-index:22;right:max(12px,env(safe-area-inset-right));bottom:max(10px,env(safe-area-inset-bottom));display:flex;gap:5px;}
+.boardDock button{min-width:62px;min-height:38px;padding:5px 8px;border:0;border-radius:0;background:#132632eF;color:#eff8f3;font-size:11px;box-shadow:none;}
+#chainToggleBtn{display:inline-flex!important;align-items:center;justify-content:center;}
+#ownSelectedTacticPreview{z-index:15;bottom:calc(1.5% + 78px);}
+footer{display:none!important;}
+@media(max-width:760px){
+ .top-bar{height:48px;min-height:48px;padding:0 4px;flex-wrap:nowrap;}
+ .top-bar>div{width:auto;max-width:100%;overflow-x:auto;}
+ .brand{display:none;}
+ #rulesBtn,#startBtn,#comStartBtn,#autoStartBtn,#settingsBtn{font-size:8px;padding:5px 6px;white-space:nowrap;}
+ .metaBar{top:48px;left:6px;right:6px;height:20px;}
+ .battleLayout,body.historyCollapsed .battleLayout{height:var(--visible-height,100dvh);}
+ #ownHand{left:6%;width:58%;bottom:1%;height:58px;padding:12px 3px 3px;gap:3px;}
+ #ownHand .card{width:29px;min-width:29px;height:42px;padding:2px;}
+ #ownHand .cardMiniName{font-size:6px;}#ownHand .cardMiniType{font-size:5px;}
+ #oppHand{left:13%;width:68%;top:9%;height:48px;padding:8px 3px 3px;gap:3px;}
+ #oppHand .card,#oppHand .cardBack{width:25px;min-width:25px;height:35px;}
+ .chainHistoryPanel,.chainHistoryPanel.collapsed{top:16%;bottom:16%;padding:5px;font-size:8px;}
+ .chainHistoryPanel .chainTitle{font-size:9px;padding:4px 0;}
+ .chainHistoryPanel .chainItem{padding:4px;margin-bottom:5px;font-size:7px;}
+ .chainHistoryPanel .chainCardName{font-size:8px;}.chainHistoryPanel .chainTarget{font-size:7px;}
+ .activeFlowRail{max-height:30%;}
+ #boardCardPreview{top:12%;height:40vh;max-height:42%;padding:4px;gap:3px;}
+ #boardCardPreview img{width:84%;max-height:36%;}
+ #boardCardPreview .boardCardText{font-size:8px;line-height:1.35;}
+ #boardCardPreview .boardCardText strong{margin-bottom:3px;}
+ .boardDock{right:max(4px,env(safe-area-inset-right));bottom:max(4px,env(safe-area-inset-bottom));gap:3px;}
+ .boardDock button{min-width:40px;min-height:34px;padding:4px;font-size:9px;}
+ .sideColumn{right:5px;bottom:44px;width:min(92vw,370px);max-height:39vh;}
+ .sideColumn .controls{max-height:39vh;}
+ .historyArea,.historyArea.collapsed{right:5px;bottom:44px;width:min(92vw,370px);height:min(39vh,340px);}
+ #ownSelectedTacticPreview{left:2%;width:72%;bottom:62px;max-height:29%;padding:5px;}
+}
+
+/* Live power printed over each field card. */
+.autoPauseBtn{padding:7px 11px;font-size:11px;background:#324c56;border:1px solid #c0d4d4a8;color:#f4f7ee;box-shadow:0 2px 10px #0007;white-space:nowrap;}
+.autoPauseBtn[hidden]{display:none!important;}
+.arenaLevelBadge{position:absolute;z-index:2;transform:translate(-50%,18px);min-width:39px;padding:2px 5px;border:1px solid #c5b17b;background:linear-gradient(180deg,#17232beb,#0a1118f5);color:#fff2c8;text-align:center;font-size:clamp(10px,.8vw,14px);font-weight:900;line-height:1.2;letter-spacing:.02em;text-shadow:0 1px 2px #000;box-shadow:0 2px 5px #000a;pointer-events:none;}
+.arenaLevelBadge.isSideways{transform:translate(-50%,-50%);}
+.attackArrowOverlay{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none;}
+.attackArrowLine{fill:none;stroke:#fff;stroke-opacity:.9;stroke-width:7;stroke-dasharray:1 15;stroke-linecap:round;stroke-linejoin:round;filter:drop-shadow(0 0 3px #10191dcc);vector-effect:non-scaling-stroke;}
+.standbyInlineHint{margin:6px 0;padding:7px 9px;border-left:2px solid #c9b484;background:#101d29aa;color:#dce8e2;font-size:11px;line-height:1.45;}
+.chainHistoryPanel .chainItem.activeChainItem{min-height:72px;padding:7px 5px 7px 48px;}
+.chainHistoryPanel .activeChainItem::before{top:7px;width:35px;height:49px;}
+.chainHistoryPanel .activeChainItem .chainHead,.chainHistoryPanel .activeChainItem .chainCardName,.chainHistoryPanel .activeChainItem .chainTarget{position:relative;z-index:1;}
+.chainHistoryPanel .activeChainItem .chainTarget{margin-top:4px;}
+.activeChainStack{display:none!important;}
+.activeFlowRail[hidden]{display:none!important;}
+#battleStage[data-game-state="awaitTacticSelection"] .activeFlowRail{display:none!important;}
+#gameStartOverlay.battlePhaseReveal{pointer-events:none;}
+
+/* Paper stock, printed borders, and a restrained hand fan. */
+#ownHand .card{position:relative;border:1px solid #29271f!important;border-radius:2px!important;outline:1px solid #c8b98f;outline-offset:-3px;box-shadow:0 1px 0 #b9a985,0 3px 0 #222b31,0 6px 10px #000b,inset 0 0 0 2px #fff8!important;transform:translateY(var(--hand-lift,0px)) rotate(var(--hand-angle,0deg));transform-origin:50% 112%;transition:transform .14s ease-out,box-shadow .14s ease-out;}
+#ownHand .card::before{content:'';position:absolute;z-index:4;inset:3px;border:1px solid #fff8;box-shadow:inset 0 0 0 1px #1112;pointer-events:none;}
+#ownHand .card:nth-child(1){--hand-angle:-5deg;--hand-lift:7px;}#ownHand .card:nth-child(2){--hand-angle:-3.5deg;--hand-lift:4px;}#ownHand .card:nth-child(3){--hand-angle:-2deg;--hand-lift:2px;}#ownHand .card:nth-child(4){--hand-angle:0deg;--hand-lift:0px;}#ownHand .card:nth-child(5){--hand-angle:2deg;--hand-lift:2px;}#ownHand .card:nth-child(6){--hand-angle:3.5deg;--hand-lift:4px;}#ownHand .card:nth-child(7){--hand-angle:5deg;--hand-lift:7px;}
+#ownHand .card:hover,#ownHand .card.handRaised,#ownHand .card.pointerHover{z-index:8;outline-color:#f1d89b;transform:translateY(-13.5px) rotate(0deg) scale(1.07)!important;box-shadow:0 12px 18px #000c,0 0 0 1px #eed397!important;}
+body.touchInput #ownHand .card:hover:not(.handRaised):not(.pointerHover){transform:translateY(var(--hand-lift,0px)) rotate(var(--hand-angle,0deg))!important;}
+
+/* Larger paper cards; character cards are full illustration with a gold frame. */
+#ownHand .card{width:75px;min-width:75px;height:105px;}
+#oppHand .card,#oppHand .cardBack{width:50px;min-width:50px;height:69px;}
+.selectedTacticPreview .handRow .card{width:46.5px;min-width:46.5px;height:64.5px;}
+.handRow .card.type-character[data-art-loaded]{background-color:#13a3a7!important;background-image:var(--character-art)!important;background-repeat:no-repeat!important;background-size:90% 90%!important;background-position:center!important;border:1px solid #d2b768!important;outline:2px solid #f0d38a!important;outline-offset:-3px;color:#f8edc7!important;}
+.handRow .card.type-character[data-art-loaded]::before{inset:2px;border:1px solid #f2d98e;box-shadow:inset 0 0 0 1px #836934;}
+.handRow .card.type-character .cardMiniType,.handRow .card.type-character .cardMiniName,.handRow .card.type-character .cardSigil{display:none!important;}
+.handRow .card.type-character .cardMiniStat{position:absolute;right:4px;bottom:4px;z-index:5;margin:0;padding:2px 4px;border:1px solid #e2ca80;border-radius:2px;background:#0b2528e8;color:#fff0be;font-size:10px;line-height:1.1;text-shadow:0 1px 3px #000;}
+.card.type-tactic,.slot.type-tactic,.revealedCard.type-tactic{background:linear-gradient(145deg,#eadcc5,#cfb997)!important;border-color:#bd9c5b!important;color:#322a20!important;}
+
+/* Use the empty vertical rail for a readable full card and its effect. */
+#boardCardPreview{height:min(70vh,760px);max-height:calc(100% - 110px);}
+#boardCardPreview img{width:min(92%,300px);max-height:62%;flex:0 1 62%;}
+#boardCardPreview .boardCardText{font-size:clamp(12px,1vw,15px);line-height:1.6;}
+@media(max-width:760px){
+ #boardCardPreview{height:min(68vh,650px);max-height:calc(100% - 90px);}
+ #boardCardPreview img{width:min(94%,230px);max-height:59%;flex-basis:59%;}
+ #ownHand .card{width:36px;min-width:36px;height:51px;}
+ #ownHand .card:nth-child(1){--hand-angle:-4deg;--hand-lift:3px;}#ownHand .card:nth-child(2){--hand-angle:-2.5deg;--hand-lift:1px;}#ownHand .card:nth-child(3){--hand-angle:-1deg;--hand-lift:0px;}#ownHand .card:nth-child(4){--hand-angle:0deg;--hand-lift:0px;}#ownHand .card:nth-child(5){--hand-angle:1deg;--hand-lift:0px;}#ownHand .card:nth-child(6){--hand-angle:2.5deg;--hand-lift:1px;}#ownHand .card:nth-child(7){--hand-angle:4deg;--hand-lift:3px;}
+ #ownHand .cardMiniName{font-size:7px;}#ownHand .cardMiniType{font-size:5px;}
+}
+@media(min-width:1700px) and (min-height:900px){#ownHand .card{width:90px;min-width:90px;height:126px;}}
+@media(max-width:760px){
+ #ownHand{height:100px;padding-top:17px;padding-bottom:5px;}
+ #ownHand .card{width:54px;min-width:54px;height:76.5px;}
+ #oppHand{height:72px;padding-top:8px;padding-bottom:3px;}
+ #oppHand .card,#oppHand .cardBack{width:37.5px;min-width:37.5px;height:52.5px;}
+ .selectedTacticPreview .handRow .card{width:46.5px;min-width:46.5px;height:64.5px;}
+ #rulesBtn,#startBtn,#comStartBtn,#autoStartBtn,#settingsBtn,#autoPauseBtn{font-size:8px;padding:5px 6px;white-space:nowrap;}
+}
+
+
+/* One printed face for cards in the hand, field, inspector, and response UI. */
+.handRow .card[data-card-visual="true"]{background-image:var(--full-card-art)!important;background-size:100% 100%!important;background-position:center!important;background-repeat:no-repeat!important;background-color:transparent!important;color:transparent!important;border:0!important;outline:0!important;box-shadow:0 3px 0 #222b31,0 6px 10px #000b!important;padding:0!important;}
+.handRow .card[data-card-visual="true"]::before{display:none!important;}
+.handRow .card[data-card-visual="true"] .cardMiniType,.handRow .card[data-card-visual="true"] .cardMiniName,.handRow .card[data-card-visual="true"] .cardSigil{display:none!important;}
+.handRow .card.type-character[data-card-visual="true"]{background-color:transparent!important;border:0!important;outline:0!important;color:transparent!important;}
+.handRow .card.type-character[data-card-visual="true"]::before{inset:2px;border:1px solid #f2d98e;box-shadow:inset 0 0 0 1px #836934;}
+.handRow .card.type-character[data-card-visual="true"] .cardMiniStat{display:none!important;}
+.handRow .cardBack[data-shared-back="true"],#oppHand .cardBack[data-shared-back="true"]{background-image:var(--shared-card-back)!important;background-size:100% 100%!important;background-position:center!important;background-repeat:no-repeat!important;background-color:transparent!important;color:transparent!important;border:0!important;outline:0!important;box-shadow:none!important;padding:0!important;aspect-ratio:2/3!important;}
+.pileSlot.deck[data-shared-back="true"]{background-image:var(--shared-card-back)!important;background-size:100% 100%!important;background-position:center!important;background-repeat:no-repeat!important;background-color:transparent!important;border:0!important;outline:0!important;box-shadow:none!important;aspect-ratio:2/3!important;}
+.handRow .cardBack[data-shared-back="true"]::after,.pileSlot.deck[data-shared-back="true"]::after{display:none!important;}
+.pileSlot.deck[data-shared-back="true"]>div:first-child{opacity:0;}.pileSlot.deck[data-shared-back="true"] .pileCount{color:#fff1c8!important;text-shadow:0 1px 3px #000,0 0 5px #000;}
+#ownHand .cardBack[data-shared-back="true"]{width:75px;min-width:75px;height:112.5px;}
+#oppHand .cardBack[data-shared-back="true"]{width:50px;min-width:50px;height:75px;}
+@media(max-width:760px){#ownHand .cardBack[data-shared-back="true"]{width:54px;min-width:54px;height:81px;}#oppHand .cardBack[data-shared-back="true"]{width:37.5px;min-width:37.5px;height:56.25px;}}
+/* Printed faces use image elements: large canvas URLs must not pass through CSS variables. */
+.handRow .card,.cardBack,.pileSlot.deck{position:relative}
+.printedCardFace{position:absolute;inset:0;width:100%;height:100%;object-fit:fill;pointer-events:none;border-radius:inherit}
+.handRow .card[data-card-visual="true"],.cardBack[data-shared-back="true"],.pileSlot.deck[data-shared-back="true"]{background-image:none!important}
+.pileSlot.deck .pileCount{position:relative;z-index:1}
+.handRow .card.type-character:not([data-card-visual="true"]) .cardMiniName{display:block!important}
+#ownHand{height:155px!important}#oppHand{height:115px!important}
+@media(max-width:700px){#ownHand{height:125px!important}#oppHand{height:95px!important}}
+@media(max-height:500px){
+ #ownHand{height:112px!important;width:60%!important}
+ #ownHand .card{width:54px!important;min-width:54px!important;height:76px!important}
+ #oppHand{height:82px!important}
+ #oppHand .card,#oppHand .cardBack{width:38px!important;min-width:38px!important;height:54px!important}
+}
+#gameStartOverlay{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;background:#000;color:#f5f5f5;text-align:center;pointer-events:auto}
+#gameStartOverlay[hidden]{display:none}
+#gameStartOverlay.boardReveal,#gameStartOverlay.phaseReveal{background:transparent}
+.gameStartContent{display:flex;flex-direction:column;align-items:center;gap:18px;padding:24px}
+#gameStartTitle{font-size:clamp(22px,4vw,38px);font-weight:600;letter-spacing:.22em}
+#gameStartOrder{font-size:clamp(15px,2vw,21px);letter-spacing:.08em}
+#gameStartLoading{font-size:13px;color:#b8c1c4}
+#gameStartOverlay.phaseReveal #gameStartTitle{padding:12px 22px;background:#071116d9;border:1px solid #c5b17b77;letter-spacing:.16em}
+body.gameStarting #ownHand,body.gameStarting #oppHand,body.gameStarting #ownSelectedTacticHand{visibility:hidden}
+
+/* Independent selection surface in the left scenery space. */
+#selectionPanel{left:9px;top:9%;bottom:65px;width:23%;max-width:none;}
+#selectionPanel .selectionCardGrid{grid-template-columns:repeat(4,minmax(0,1fr));align-content:start;}
+#battleStage.selectingCards #chainHistoryShell{visibility:hidden;pointer-events:none;}
+@media(max-width:760px){#selectionPanel{left:4px;top:12%;bottom:auto;width:38%;height:65%;}#selectionPanel .selectionCardGrid{grid-template-columns:repeat(3,minmax(0,1fr));}}
+
+/* Selection survives printed card artwork and uses a distinct placement color. */
+#ownHand .card.selected::after,#oppHand .card.selected::after{content:'';position:absolute;inset:0;z-index:9;border:3px solid #ffb347;box-shadow:inset 0 0 0 1px #613400,0 0 9px #ffb347;border-radius:2px;pointer-events:none;}
+.boardTargetOverlay{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none;}
+.boardLegalSlot{fill:#36dfff;fill-opacity:.17;stroke:#36dfff;stroke-width:3;vector-effect:non-scaling-stroke;pointer-events:all;cursor:pointer;filter:drop-shadow(0 0 4px #36dfff);}
+.boardLegalSlot:hover,.boardLegalSlot:focus{fill-opacity:.3;stroke:#b8f7ff;outline:none;}
+.boardSelectedSlot{fill:#ffb347;fill-opacity:.12;stroke:#ffb347;stroke-width:3;vector-effect:non-scaling-stroke;pointer-events:none;}
+
+.boardSupportMinus{fill:#ff6474;fill-opacity:.22;stroke:#ff6474;stroke-width:3;pointer-events:none;}
+.boardSupportPlus{fill:#63ff9a;fill-opacity:.22;stroke:#63ff9a;stroke-width:3;pointer-events:none;}
+/* Board actions use the actual projected deck centers. */
+#deckActions{position:absolute;inset:0;z-index:24;pointer-events:none;}
+#deckActions .deckOrb{position:absolute;transform:translate(-50%,-50%);margin:0;padding:3px;border-radius:50%;border:2px solid #fff8;min-width:0;min-height:0;color:white;font-size:clamp(10px,1vw,16px);font-weight:900;line-height:1.15;text-align:center;pointer-events:auto;box-shadow:inset -5px -7px 12px #0008,inset 3px 4px 8px #fff5,0 5px 10px #0008;}
+#deckActions .deckConfirm{background:radial-gradient(circle at 32% 25%,#76cbd0,#206873 65%,#133943);}
+#deckActions .deckCancel{background:radial-gradient(circle at 32% 25%,#a8adbf,#474e67 65%,#242839);}
+#deckActions .deckPass{background:radial-gradient(circle at 32% 25%,#ff8b88,#be2533 65%,#671721);}
+#deckActions .deckOrb:disabled{opacity:.4;cursor:default;}
+.decisionPanel{transform:translate(-50%,0);}
+#pilePanel{position:absolute;z-index:23;right:9px;top:10%;bottom:90px;width:23%;padding:10px;border:1px solid #9bb9c3;background:#0b1b29f2;border-radius:8px;overflow-y:auto;color:#eee;}
+#pilePanel[hidden]{display:none!important;}.pileCardGrid{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-top:9px;}
+#pilePanel .card{width:100%;min-width:0;height:auto;aspect-ratio:384/538;}
+#standbyTransitionOverlay{position:fixed;inset:0;z-index:1100;display:grid;place-items:center;background:#000;color:white;font-size:clamp(24px,5vw,68px);letter-spacing:.08em;font-weight:800;pointer-events:auto;}
+.chainHistoryPanel .chainItem.player-A{background-color:#173a52;border-color:#65b5ef;}
+.chainHistoryPanel .chainItem.player-B{background-color:#512734;border-color:#f38b9c;}
+.chainHistoryPanel .chainItem.activeChainItem.player-A{background:linear-gradient(120deg,#20465e,#112738);}
+.chainHistoryPanel .chainItem.activeChainItem.player-B{background:linear-gradient(120deg,#613344,#311821);}
+@media(max-width:760px){#pilePanel{width:37%;right:4px;padding:5px;}#pilePanel .pileCardGrid{grid-template-columns:repeat(2,minmax(0,1fr));}}
+
+.controlBtn[hidden]{display:none!important;}
+
+/* Phase text stays on the board; only interaction is blocked during preparation. */
+#standbyTransitionOverlay{position:absolute;background:transparent;font-size:clamp(20px,3.5vw,54px);text-align:center;}
+#standbyTransitionOverlay span:not(:empty){padding:12px 22px;background:#071116d9;border:1px solid #c5b17b77;letter-spacing:.16em;}
+.chainPanelHeading{flex:none;color:#fff;padding:4px 0;font-size:14px;}
+.chainHistoryPanel .chainItem.player-A{background:#173a52!important;border-color:#65b5ef!important;color:#eef8ff!important;}
+.chainHistoryPanel .chainItem.player-B{background:#512734!important;border-color:#f38b9c!important;color:#fff0f4!important;}
+.chainHistoryPanel .chainItem.resolving,.chainHistoryPanel .chainItem.resolvedNow{outline:2px solid white;outline-offset:-3px;}
+#decisionPanel{left:9px;top:12%;transform:none;width:23%;max-height:65%;overflow-y:auto;}
+#decisionPanel[hidden]{display:none!important;}
+/* Readable deck actions and a continuous route from attacker to target. */
+#deckActions .deckOrb{box-sizing:border-box;overflow:hidden;word-break:keep-all;overflow-wrap:normal;line-height:1.25;padding:5px;}
+.attackArrowLine{stroke-width:4;stroke-dasharray:1 9;stroke-opacity:1;}
+
+#deckActions .deckOrb{white-space:pre-line;}
+#decisionPanel .valueBox{background:#122c39;color:#f0f7fa;border:1px solid #66818c;}
+#decisionPanel .revealedCard{color:#f0f7fa;background:#183743;border-color:#66818c;}
+
+/* Direct selection keeps concealed hands concealed until Scout confirms. */
+#oppHand .cardBack.legalTarget{cursor:pointer;outline:2px solid #85d8d2!important;outline-offset:2px;}
+#oppHand .cardBack.selected{outline:3px solid #88ffb9!important;outline-offset:2px;}
