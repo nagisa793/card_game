@@ -1,0 +1,103 @@
+name: Import DUEL ARENA v58
+
+on:
+  push:
+    paths:
+      - ".github/workflows/import-duel-arena.yml"
+      - "VERIFY-SHA256.json"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download exact published dist files and verify SHA-256
+        env:
+          BASE_URL: https://duel-arena.nagisa793.chatgpt.site
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, os, sys, urllib.parse, urllib.request
+          from pathlib import Path
+
+          base = os.environ["BASE_URL"].rstrip("/")
+          with open("VERIFY-SHA256.json", "r", encoding="utf-8") as f:
+              manifest = json.load(f)["files"]
+
+          dist_items = [(rel, sha) for rel, sha in manifest.items() if rel.startswith("dist/")]
+          print(f"Downloading {len(dist_items)} dist files from {base}")
+
+          for i, (rel, expected) in enumerate(dist_items, 1):
+              public_path = rel[len("dist/"):]
+              url = base + "/" + urllib.parse.quote(public_path, safe="/")
+              dest = Path(rel)
+              dest.parent.mkdir(parents=True, exist_ok=True)
+              try:
+                  req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+                  with urllib.request.urlopen(req, timeout=120) as r, open(dest, "wb") as out:
+                      out.write(r.read())
+              except Exception as e:
+                  print(f"FAILED {rel}: {e}", file=sys.stderr)
+                  sys.exit(1)
+
+              actual = hashlib.sha256(dest.read_bytes()).hexdigest()
+              if actual != expected:
+                  print(f"SHA256 MISMATCH {rel}", file=sys.stderr)
+                  print(f" expected: {expected}", file=sys.stderr)
+                  print(f" actual:   {actual}", file=sys.stderr)
+                  sys.exit(1)
+              print(f"[{i}/{len(dist_items)}] OK {rel}")
+
+          print("All published dist files match VERIFY-SHA256.json")
+          PY
+
+      - name: Verify all currently available original files
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, os, sys
+          from pathlib import Path
+
+          with open("VERIFY-SHA256.json", "r", encoding="utf-8") as f:
+              manifest = json.load(f)["files"]
+
+          missing = []
+          bad = []
+          for rel, expected in manifest.items():
+              p = Path(rel)
+              if not p.is_file():
+                  missing.append(rel)
+                  continue
+              actual = hashlib.sha256(p.read_bytes()).hexdigest()
+              if actual != expected:
+                  bad.append((rel, expected, actual))
+
+          if missing:
+              print("Missing files not yet imported:")
+              for p in missing:
+                  print(" -", p)
+
+          if bad:
+              print("SHA mismatches:", file=sys.stderr)
+              for rel, exp, act in bad:
+                  print(rel, exp, act, file=sys.stderr)
+              sys.exit(1)
+
+          print(f"Verified {len(manifest)-len(missing)} / {len(manifest)} original files.")
+          PY
+
+      - name: Commit imported runtime files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add dist
+          if git diff --cached --quiet; then
+            echo "No runtime changes to commit."
+            exit 0
+          fi
+          git commit -m "Import DUEL ARENA v58 runtime from published Site"
+          git push
