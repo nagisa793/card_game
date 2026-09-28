@@ -56,6 +56,54 @@ jobs:
           print("All published dist files match VERIFY-SHA256.json")
           PY
 
+      - name: Recover exact original index from hosted HTML
+        env:
+          BASE_URL: https://duel-arena.nagisa793.chatgpt.site
+        run: |
+          python3 - <<'PY'
+          import hashlib, os, sys, urllib.request
+          from pathlib import Path
+
+          expected = "998b332f6aa2117a9b2f4f39efcad0d104650f07096438c5ec6d74b01317efbd"
+          original_size = 17760
+          url = os.environ["BASE_URL"].rstrip("/") + "/index.html"
+          req = urllib.request.Request(url, headers={"User-Agent":"Mozilla/5.0"})
+          data = urllib.request.urlopen(req, timeout=120).read()
+          print("hosted index bytes:", len(data), "extra:", len(data)-original_size)
+
+          if hashlib.sha256(data).hexdigest() == expected:
+              recovered=data
+          else:
+              recovered=None
+              delta=len(data)-original_size
+              if delta >= 0:
+                  # Most hosting transformations are one injected contiguous block.
+                  for i in range(0, len(data)-delta+1):
+                      cand=data[:i]+data[i+delta:]
+                      if len(cand)==original_size and hashlib.sha256(cand).hexdigest()==expected:
+                          print("Recovered by removing one injected block:", i, delta)
+                          recovered=cand
+                          break
+                  # Also try a prefix/suffix split whose total equals the size delta.
+                  if recovered is None:
+                      for pre in range(delta+1):
+                          post=delta-pre
+                          cand=data[pre:len(data)-post if post else None]
+                          if len(cand)==original_size and hashlib.sha256(cand).hexdigest()==expected:
+                              print("Recovered by trimming prefix/suffix:", pre, post)
+                              recovered=cand
+                              break
+
+          if recovered is None:
+              print("Could not reconstruct exact original index from hosted transformation.", file=sys.stderr)
+              print("hosted sha256:", hashlib.sha256(data).hexdigest(), file=sys.stderr)
+              sys.exit(1)
+
+          Path("dist").mkdir(exist_ok=True)
+          Path("dist/index.html").write_bytes(recovered)
+          print("Exact index recovered:", hashlib.sha256(recovered).hexdigest())
+          PY
+
       - name: Verify imported published runtime files
         run: |
           python3 - <<'PY'
