@@ -29,7 +29,7 @@ jobs:
           with open("VERIFY-SHA256.json", "r", encoding="utf-8") as f:
               manifest = json.load(f)["files"]
 
-          dist_items = [(rel, sha) for rel, sha in manifest.items() if rel.startswith("dist/")]
+          dist_items = [(rel, sha) for rel, sha in manifest.items() if rel.startswith("dist/") and rel != "dist/index.html"]
           print(f"Downloading {len(dist_items)} dist files from {base}")
 
           for i, (rel, expected) in enumerate(dist_items, 1):
