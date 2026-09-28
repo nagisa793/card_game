@@ -134,6 +134,32 @@ jobs:
           print(f"Verified {len(targets)} / {len(targets)} imported runtime files.")
           PY
 
+      - name: Verify complete exported set except standalone regression harness
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, sys
+          from pathlib import Path
+          with open("VERIFY-SHA256.json","r",encoding="utf-8") as f:
+              manifest=json.load(f)["files"]
+          excluded={"tests/rules-regression.cjs"}
+          bad=[]
+          for rel,expected in manifest.items():
+              if rel in excluded:
+                  continue
+              p=Path(rel)
+              if not p.is_file():
+                  bad.append((rel,expected,"MISSING"))
+                  continue
+              actual=hashlib.sha256(p.read_bytes()).hexdigest()
+              if actual != expected:
+                  bad.append((rel,expected,actual))
+          if bad:
+              print("Full-set verification failed:",file=sys.stderr)
+              for row in bad: print(*row,file=sys.stderr)
+              sys.exit(1)
+          print(f"Verified {len(manifest)-len(excluded)} / {len(manifest)} original ZIP files exactly.")
+          PY
+
       - name: Commit imported runtime files
         run: |
           git config user.name "github-actions[bot]"
