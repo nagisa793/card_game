@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DUEL ARENA | カードバトル</title>
+<link rel="stylesheet" href="./src/legacy.css?v=39"><link rel="stylesheet" href="./src/interface.css?v=58">
+</head>
+<body>
+<div class="top-bar">
+  <a class="brand" href="./index.html"><span>◇</span> DUEL ARENA</a><h1 id="simTitle" hidden></h1>
+  <div>
+    <button id="rulesBtn" type="button" aria-controls="rulesOverlay" aria-expanded="false">ルール説明</button>
+    <button id="startBtn">両者手動で開始</button>
+    <button id="comStartBtn">対COMバージョン</button>
+    <button id="autoStartBtn">COM同士を観戦</button>
+    <button id="autoPauseBtn" class="autoPauseBtn" data-action="toggle-auto" type="button" hidden>⏸ 一時停止</button>
+    <button id="settingsBtn" class="utilityBtn" type="button" aria-controls="settingsOverlay" aria-expanded="false">演出設定</button>
+    <button id="chainToggleBtn" class="utilityBtn" type="button" aria-controls="chainHistoryShell" aria-expanded="true">攻防連鎖を畳む</button>
+    <button id="historyToggleBtn" class="utilityBtn" type="button" aria-controls="historyArea" aria-expanded="true">履歴を畳む</button>
+    <button id="tacticPreviewBtn" class="utilityBtn" type="button" aria-controls="ownSelectedTacticPreview" aria-expanded="false" hidden>選択した戦術手札</button>
+    <span id="scoreText">対戦成績：— vs —</span>
+    <span class="historyControls">
+      <button id="undoBtn" class="historyBtn" disabled title="直前の操作前へ戻る">↶ 一つ戻る</button>
+      <button id="redoBtn" class="historyBtn" disabled title="戻した操作をもう一度進める">↷ 一つ進む</button>
+    </span>
+  </div>
+</div>
+<div class="rulesOverlay" id="rulesOverlay" hidden>
+  <section class="rulesDialog" role="dialog" aria-modal="true" aria-labelledby="rulesTitle">
+    <header class="rulesHeader">
+      <h2 id="rulesTitle">ルール説明・遊び方</h2>
+      <button class="rulesClose" id="rulesCloseBtn" type="button">閉じる</button>
+    </header>
+    <div class="rulesBody">
+      <p class="rulesLead">右側の一覧からカードを選び、盤面中央で効果や対象を決めます。「盤面を見る」で操作を一時的に畳めます。対戦は次の順番です。</p>
+      <div class="rulesFlow" aria-label="対戦の流れ">
+        <div>1. 先攻後攻</div>
+        <div>2. 盤面構築</div>
+        <div>3. 戦術手札</div>
+        <div>4. 攻防</div>
+        <div>5. 勝敗判定</div>
+      </div>
+      <section class="rulesSection">
+        <h3>1．対戦を始める</h3>
+        <ul>
+          <li><b>両者手動</b>：AさんとBさんを一人で交互に操作します。全情報を表示します。</li>
+          <li><b>対COM</b>：自分は下側の「あなた」を操作します。COMの手札と伏せ罠は見えず、COMは約3秒ごとに行動します。</li>
+          <li><b>COM同士</b>：両者が約3秒ごとに一手ずつ進めます。手札も表示され、マッチ終了まで自動で観戦できます。</li>
+          <li>先攻と後攻は対戦開始時にランダムで決まります。</li>
+        </ul>
+      </section>
+      <section class="rulesSection">
+        <h3>2．スタンバイフェイズで盤面を作る</h3>
+        <ol>
+          <li>メインデッキから7枚引きます。キャラが0枚なら手札をすべて公開し、デッキへ戻してシャッフルしてから7枚引き直します。</li>
+          <li>キャラカードをバトルエリアへ出します。バトルエリアは1〜5番の固定枠で、召喚する側が配置先を選びます。キャラが場を離れても残りのキャラの位置は動きません。</li>
+          <li>展開カードでキャラの強化、召喚、ドロー、サーチなどを行います。展開カードによる攻撃力上昇は永続です。</li>
+          <li>罠カードを作戦エリアへ裏向きで伏せます。作戦エリアは5枠です。</li>
+          <li>残ったメイン手札もすべて処理し、手札が0枚になったらスタンバイを終了します。</li>
+        </ol>
+        <p class="rulesNote">戦術デッキの最初の手札も7枚です。対COMでは操作者が戦術デッキから好きな7枚を選び、残りをシャッフルします。</p>
+      </section>
+      <section class="rulesSection">
+        <h3>3．各ターンの操作</h3>
+        <ol>
+          <li>ターン開始時、戦術手札が3枚以下なら戦術デッキから1枚引きます。4枚以上なら引きません。</li>
+          <li>攻撃するキャラを1体以上選び、相手の攻撃対象を1体選びます。</li>
+          <li>複数キャラで攻撃する場合、攻撃側の合計は攻撃対象の攻撃力＋1までです。単騎攻撃にはこの上限がありません。</li>
+          <li>攻撃宣言後は防御側から罠・戦術カードを使うかパスします。</li>
+        </ol>
+      </section>
+      <section class="rulesSection">
+        <h3>4．攻防連鎖と連続発動</h3>
+        <ul>
+          <li><span class="rulesTerm">攻防連鎖</span>：両者が交互に罠・戦術カードを1枚ずつ発動するやり取りです。両者が続けてパスすると効果処理へ進みます。</li>
+          <li><span class="rulesTerm">連続発動</span>：その表示を持つ一部のカードだけの特殊効果です。自分がカードを発動した直後、相手へ交代せずもう一度自分が発動できます。</li>
+          <li>戦術カードは作戦エリアの空き枠に表向きで置いて発動します。罠も発動すると表向きになります。</li>
+          <li>戦術カードによる攻撃力の増減はその攻防ステップ中だけです。罠カードによる増減は永続です。</li>
+          <li>対象を指定する効果は、攻撃・防御に参加しているかに関係なく、効果が指定する側のバトルエリアにいる全キャラから選べます。標的変更などが未処理でも先回りして指定できます。</li>
+          <li>表向きの戦術・罠カードは全効果の処理が終わるまで作戦エリアに残り、その後まとめて撤退エリアへ移ります。</li>
+          <li>確定した効果は<b>最後に発動したカードから最初のカードへ</b>逆順で処理します。</li>
+        </ul>
+        <p class="rulesNote">攻防連鎖の途中で攻撃力が0になっても、すぐには撤退しません。すべての効果と攻撃結果を処理した時点で0なら撤退します。</p>
+      </section>
+      <section class="rulesSection">
+        <h3>5．攻撃結果</h3>
+        <p>すべての効果処理後、攻撃側の参加キャラの合計攻撃力と攻撃対象1体の攻撃力を比べます。</p>
+        <ul>
+          <li>攻撃側が上回る：攻撃対象が撤退します。</li>
+          <li>防御側が上回る：攻撃に参加したキャラがすべて撤退します。</li>
+          <li>単騎対単騎で同数：両方の元の攻撃力を永続で1下げます。Lv0になったキャラは攻撃結果の完了時に撤退します。</li>
+          <li>複数対単騎で同数：単騎側の攻撃力を永続で1下げ、単騎側が複数側から撤退させるキャラ1体を選びます。</li>
+        </ul>
+      </section>
+      <section class="rulesSection">
+        <h3>6．パスと勝敗</h3>
+        <ul>
+          <li>攻撃宣言をパスした回数は、あとで攻撃しても消えずに累積します。2回目のパスから除外ペナルティが発生し、回数ごとに重くなります。</li>
+          <li>相手のキャラがすべていなくなると勝利です。両者同時に全滅した場合は残っている罠・戦術カードの枚数で判定します。</li>
+          <li>両者とも作戦エリアの罠・戦術手札・戦術デッキが完全に0枚になった場合もゲーム終了です。その場合は残っているキャラの攻撃力合計で判定します。</li>
+          <li>完全に同点なら得点を付けず、先攻後攻を再抽選して再試合します。</li>
+          <li>2勝を先取した側がマッチ勝利です。</li>
+        </ul>
+      </section>
+      <section class="rulesSection">
+        <h3>画面の補助機能</h3>
+        <ul>
+          <li>盤面のカードや山札を押すと、右側の「CARD INFORMATION」に詳細が表示されます。</li>
+          <li>青く発光しているカードや枠は選択可能です。右側の操作ボタンだけでなく盤面を直接押しても選べます。</li>
+          <li>攻撃キャラと攻撃対象は横向きになります。操作欄でキャラを選ぶと、対応する盤面のカードが緑色に強調されます。</li>
+          <li>左端の縦長の「攻防連鎖」には攻撃宣言・パス・発動カード・対象・処理結果が最新順で残ります。そのすぐ右、盤面左側の縦レーンには現在進行中のCHAINとRESOLVEを表示します。</li>
+          <li>カードの詳細は盤面右側、両者の山札より右にある「CARD INFORMATION」で確認できます。</li>
+          <li>「一つ戻る」「一つ進む」で操作をやり直せます。</li>
+          <li>上部の「演出設定」で画面の動きと処理レーンの強調表示を変更できます。攻防連鎖と対戦履歴は折り畳めます。</li>
+          <li>各カード固有の詳しい条件は「操作」に表示されるカード本文を確認してください。</li>
+        </ul>
+      </section>
+      <div class="rulesFooter"><button class="rulesClose" id="rulesBottomCloseBtn" type="button">説明を閉じる</button></div>
+    </div>
+  </section>
+</div>
+<div class="settingsOverlay" id="settingsOverlay" hidden>
+  <section class="settingsDialog" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+    <header class="settingsHeader">
+      <h2 id="settingsTitle">演出設定</h2>
+      <button class="settingsClose" id="settingsCloseBtn" type="button">閉じる</button>
+    </header>
+    <div class="settingsBody">
+      <div class="settingRow"><span>画面の動き</span><div class="settingOptions"><label class="settingChoice"><input type="radio" name="motionSpeed" value="normal" checked>標準</label><label class="settingChoice"><input type="radio" name="motionSpeed" value="fast">高速</label><label class="settingChoice"><input type="radio" name="motionSpeed" value="off">なし</label></div></div>
+      <div class="settingRow"><span>CHAIN・RESOLVEの強調表示</span><label class="settingChoice"><input type="checkbox" id="cinematicsToggle" checked>表示する</label></div>
+      <div class="settingRow audioSetting"><label class="settingChoice"><input type="checkbox" id="bgmToggle" checked>BGM</label><label>音量 <input id="bgmVolume" type="range" min="0" max="100" value="22" aria-label="BGMの音量"></label></div>
+      <div class="settingRow audioSetting"><label class="settingChoice"><input type="checkbox" id="seToggle" checked>効果音</label><label>音量 <input id="seVolume" type="range" min="0" max="100" value="38" aria-label="効果音の音量"></label></div>
+      <div class="settingRow"><span>描画品質</span><select id="graphicsQuality"><option value="standard">標準</option><option value="high">高画質</option><option value="low">軽量</option></select><input type="checkbox" id="arena3dToggle" checked hidden></div>
+      <p class="settingNote" id="arena3dStatus">標準は高画質の見た目を保ちながら描画負荷を抑えます。高画質と軽量は設定から選べます。</p>
+      <p class="settingNote">BGMと効果音は個別に消せます。ゲームのルールや処理速度は変わりません。</p>
+    </div>
+  </section>
+</div>
+<div class="metaBar"><div id="phaseBanner">フェーズ：未開始</div></div>
+<div class="battleLayout">
+<aside class="chainPanel chainHistoryPanel" id="chainHistoryShell" aria-label="攻防連鎖の履歴"><div id="chainPanel"><div class="chainTitle"><span>攻防連鎖</span><span class="chainOrder">最新が上</span></div><div class="chainEmpty">攻撃宣言・パス・発動カード・対象・処理結果をここへ表示します。</div></div></aside>
+<div class="stage" id="battleStage">
+  <div id="sceneViewport"><canvas id="sceneCanvas" aria-label="3D対戦盤面"></canvas><div id="worldLabels"></div></div>
+  <aside id="selectionPanel" class="selectionPanel" aria-label="カード選択" hidden><div id="selectionPanelTitle" class="selectionPanelTitle"></div><div id="selectionPanelContent" class="selectionPanelContent"></div></aside>
+<div id="arenaNotice" hidden></div>
+<div id="gameStartOverlay" hidden role="status" aria-live="polite"><div class="gameStartContent"><strong id="gameStartTitle">GAME START</strong><span id="gameStartOrder"></span><span id="gameStartLoading">盤面を準備中…</span></div></div>
+<div id="welcome"><div><button data-start-mode="com">対COMで遊ぶ</button><button data-start-mode="manual">両者手動</button><button data-start-mode="auto">COM同士を観戦</button></div></div>
+  <div class="activeFlowRail" id="activeFlowRail" aria-label="現在のCHAINとRESOLVE"><div class="duelOverlay" id="duelOverlay" aria-live="polite"></div><div class="resolutionBanner" id="resolutionBanner" aria-live="polite"></div><div class="activeChainStack" id="activeChainStack" aria-live="polite"></div></div>
+  <div class="half opp" id="oppHalf">
+    <div class="label" id="oppHandLabel">相手（Bさん）の手札</div><div class="handRow" id="oppHand"></div>
+    <div class="zoneRow"><div class="zoneFrame"><div class="label">撤退エリア</div><div id="oppRetreat"></div></div><div class="zoneFrame"><div class="label">相手の作戦エリア</div><div class="zoneGrid" id="oppTactic"></div></div><div class="zoneFrame"><div class="label">戦術デッキ</div><div id="oppTacticDeck"></div></div></div>
+    <div class="zoneRow"><div class="zoneFrame"><div class="label">除外エリア</div><div id="oppExclusion"></div></div><div class="zoneFrame"><div class="label" id="oppBattleLabel">相手（Bさん）のバトルエリア</div><div class="zoneGrid" id="oppBattle"></div></div><div class="zoneFrame"><div class="label">メインデッキ</div><div id="oppMainDeck"></div></div></div>
+  </div>
+  <div class="midline"></div>
+  <div class="half own" id="ownHalf">
+    <div class="zoneRow"><div class="zoneFrame"><div class="label">除外エリア</div><div id="ownExclusion"></div></div><div class="zoneFrame"><div class="label" id="ownBattleLabel">自分（Aさん）のバトルエリア</div><div class="zoneGrid" id="ownBattle"></div></div><div class="zoneFrame"><div class="label">メインデッキ</div><div id="ownMainDeck"></div></div></div>
+    <div class="zoneRow"><div class="zoneFrame"><div class="label">撤退エリア</div><div id="ownRetreat"></div></div><div class="zoneFrame"><div class="label">自分の作戦エリア</div><div class="zoneGrid" id="ownTactic"></div></div><div class="zoneFrame"><div class="label">戦術デッキ</div><div id="ownTacticDeck"></div></div></div>
+    <div class="label" id="ownHandLabel">自分（Aさん）の手札</div><div class="handRow" id="ownHand"></div>
+  </div>
+  <aside class="cardInspector cardInfoRail" id="cardInspector" aria-live="polite"><div class="inspectorHeading">CARD INFORMATION</div><div class="inspectorCard" id="inspectorCard"><div class="inspectorType" id="inspectorType">カード情報</div><div class="inspectorName" id="inspectorName">選択待ち</div></div><div class="inspectorEffect" id="inspectorEffect">盤面のカードを押すと、ここに詳細を表示します。</div><div class="inspectorHint">発光しているカードや枠は、盤面を直接クリックしても選択できます。</div></aside>
+</div>
+<div class="sideColumn"><div class="selectedTacticPreview" id="ownSelectedTacticPreview" hidden><div class="label">選択した戦術手札 <button id="closeTacticPreviewBtn" type="button" aria-label="戦術手札を閉じる">閉じる</button></div><div class="handRow" id="ownSelectedTacticHand"></div></div><div class="status" id="status"></div><div class="controls" id="controls"><div class="controlsTitle">操作</div><div class="controlsText">「対戦開始」を押してください。</div></div></div>
+</div>
+<div class="historyArea" id="historyArea"><div class="historyTitle"><span>対戦履歴</span><span>最新の記録が上です</span></div><div class="log" id="log"></div></div>
+<footer id="modeFooter">これはルール検証用シミュレーターです。AさんとBさんの判断はすべて手動で操作します。本来は非公開の相手の手札・伏せ札も含めて全情報を表示しています。</footer>
+<script type="importmap">{"imports":{"three":"./vendor/three.module.js"}}</script>
+<script src="./src/engine.js?v=58"></script>
+<script type="module" src="./src/boot.js?v=58"></script>
+</body>
+</html>
