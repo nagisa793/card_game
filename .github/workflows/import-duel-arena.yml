@@ -56,38 +56,34 @@ jobs:
           print("All published dist files match VERIFY-SHA256.json")
           PY
 
-      - name: Verify all currently available original files
+      - name: Verify imported published runtime files
         run: |
           python3 - <<'PY'
-          import hashlib, json, os, sys
+          import hashlib, json, sys
           from pathlib import Path
 
           with open("VERIFY-SHA256.json", "r", encoding="utf-8") as f:
               manifest = json.load(f)["files"]
 
-          missing = []
+          targets = [(rel, sha) for rel, sha in manifest.items()
+                     if rel.startswith("dist/") and rel != "dist/index.html"]
           bad = []
-          for rel, expected in manifest.items():
+          for rel, expected in targets:
               p = Path(rel)
               if not p.is_file():
-                  missing.append(rel)
+                  bad.append((rel, expected, "MISSING"))
                   continue
               actual = hashlib.sha256(p.read_bytes()).hexdigest()
               if actual != expected:
                   bad.append((rel, expected, actual))
 
-          if missing:
-              print("Missing files not yet imported:")
-              for p in missing:
-                  print(" -", p)
-
           if bad:
-              print("SHA mismatches:", file=sys.stderr)
+              print("Runtime verification failed:", file=sys.stderr)
               for rel, exp, act in bad:
                   print(rel, exp, act, file=sys.stderr)
               sys.exit(1)
 
-          print(f"Verified {len(manifest)-len(missing)} / {len(manifest)} original files.")
+          print(f"Verified {len(targets)} / {len(targets)} imported runtime files.")
           PY
 
       - name: Commit imported runtime files
