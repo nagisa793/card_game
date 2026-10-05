@@ -1,4 +1,4 @@
-name: Import DUEL ARENA v58
+name: Import DUEL ARENA v77
 
 on:
   push:
@@ -64,8 +64,8 @@ jobs:
           import hashlib, os, sys, urllib.request
           from pathlib import Path
 
-          expected = "998b332f6aa2117a9b2f4f39efcad0d104650f07096438c5ec6d74b01317efbd"
-          original_size = 17760
+          expected = "500005797f4d4cfa535bdb237c5c95b0da7a0884bd78456331a324b8ccec2778"
+          original_size = 17545
           url = os.environ["BASE_URL"].rstrip("/") + "/index.html"
           req = urllib.request.Request(url, headers={"User-Agent":"Mozilla/5.0"})
           data = urllib.request.urlopen(req, timeout=120).read()
@@ -169,5 +169,5 @@ jobs:
             echo "No runtime changes to commit."
             exit 0
           fi
-          git commit -m "Import DUEL ARENA v58 runtime from published Site"
+          git commit -m "Import DUEL ARENA v77 runtime from published Site"
           git push
