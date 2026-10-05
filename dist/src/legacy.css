@@ -18,7 +18,7 @@
     margin-bottom:4px;
   }
   h1{font-size:16px;margin:0;font-weight:600;}
-  #rulesBtn,#startBtn,#comStartBtn,.controlBtn{
+  #rulesBtn,#comStartBtn,.controlBtn{
     font-size:14px;
     padding:8px 20px;
     border:1px solid #111;
@@ -28,7 +28,7 @@
   }
   #rulesBtn{background:#2456a6;border-color:#2456a6;margin-right:4px;}
   #comStartBtn{background:#087a3e;border-color:#087a3e;margin-left:4px;}
-  #rulesBtn:hover,#startBtn:hover,#comStartBtn:hover{filter:brightness(1.12);}
+  #rulesBtn:hover:hover,#comStartBtn:hover{filter:brightness(1.12);}
   .controlBtn{
     background:#fff;
     color:#111;
@@ -456,7 +456,7 @@
     .log{height:auto;max-height:220px;}
   }
   @media(max-width:560px){
-    #rulesBtn,#startBtn,#comStartBtn{font-size:12px;padding:7px 10px;}
+    #rulesBtn,#comStartBtn{font-size:12px;padding:7px 10px;}
     .rulesOverlay{padding:7px;}
     .rulesDialog{max-height:calc(100vh - 14px);}
     .rulesBody{padding:12px;font-size:12px;}
@@ -498,13 +498,13 @@
   }
   .top-bar>div{display:flex;align-items:center;flex-wrap:wrap;gap:4px;}
   h1{color:#fff;letter-spacing:.04em;text-shadow:0 1px 5px #000;}
-  #rulesBtn,#startBtn,#comStartBtn,.utilityBtn,.controlBtn,.historyBtn{
+  #rulesBtn,#comStartBtn,.utilityBtn,.controlBtn,.historyBtn{
     border-radius:4px;
     transition:transform .14s ease,filter .14s ease,box-shadow .14s ease,background .14s ease;
   }
-  #rulesBtn,#startBtn,#comStartBtn{padding:7px 13px;border-width:1px;}
+  #rulesBtn,#comStartBtn{padding:7px 13px;border-width:1px;}
   #rulesBtn{background:#315fbb;border-color:#78a5ff;}
-  #startBtn{background:#293746;border-color:#668198;}
+
   #comStartBtn{background:#16724f;border-color:#57c796;}
   .utilityBtn{
     min-height:30px;
@@ -1229,7 +1229,7 @@ h1{letter-spacing:.14em;font-weight:600;font-size:15px;}
 .top-bar h1::before{content:'◇';color:#a9e7e8;margin-right:9px;font-size:21px;vertical-align:-1px;}
 #rulesBtn{background:#283b58;border-color:#596e90;}
 #comStartBtn{background:linear-gradient(130deg,#215b56,#193e3d);border-color:#70aba0;}
-#startBtn{background:linear-gradient(130deg,#3b414b,#242b35);border-color:#747d89;}
+
 .utilityBtn,.historyBtn{background:#141d26;border-color:#3c4c5b;color:#becbd6;}
 #phaseBanner{background:linear-gradient(90deg,#24424c,#14212d);border-color:#476673;box-shadow:none;}
 .stage{background:radial-gradient(ellipse at 50% 50%,#263b44 0%,#111c25 55%,#0a111a 100%);border:1px solid #44505b;box-shadow:inset 0 1px #a6c4ca21,inset 0 0 65px #0008,0 12px 25px #0006;}

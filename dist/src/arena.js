@@ -4,7 +4,7 @@ import * as T from 'three';
 import {RoundedBoxGeometry} from '../vendor/addons/geometries/RoundedBoxGeometry.js';
 import {mergeGeometries} from '../vendor/addons/utils/BufferGeometryUtils.js';
 import {RoomEnvironment} from '../vendor/addons/environments/RoomEnvironment.js';
-import {palette,cardTexture} from './materials.js?v=32';
+import {palette,cardTexture,waitForCardBack} from './materials.js?v=33';
 
 export class Arena {
  constructor(canvas,labels){
@@ -29,7 +29,7 @@ export class Arena {
   this.scene.add(new T.HemisphereLight(0xc9f7ff,0x38402d,2.1));
   const sun=new T.DirectionalLight(0xffe6ae,3.8);sun.position.set(-7,13,6);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);Object.assign(sun.shadow.camera,{left:-14,right:14,top:14,bottom:-14,near:1,far:40});sun.shadow.bias=-.0006;sun.shadow.normalBias=.025;this.scene.add(sun);this.sun=sun;
   const rim=new T.DirectionalLight(0x87c7e2,2);rim.position.set(5,5,-10);this.scene.add(rim);
-  T.DefaultLoadingManager.onLoad=()=>{this.renderer.shadowMap.needsUpdate=true;this.captureStaticBackground();this.invalidate();};this.mat=palette();this.fixed=new T.Group();this.scene.add(this.fixed);this.cards=new Map();this.rings=[];this.crystals=[];this.slots=[];this.piles=[];this.ray=new T.Raycaster();this.pointer=new T.Vector2();this.pointerEvent=null;this.pointerInside=false;this.lastRender=0;this.needs=true;this.animatingUntil=0;this.motion=true;this.disposed=false;
+  T.DefaultLoadingManager.onLoad=async()=>{await waitForCardBack();this.renderer.shadowMap.needsUpdate=true;this.captureStaticBackground();this.invalidate();};this.mat=palette();this.fixed=new T.Group();this.scene.add(this.fixed);this.cards=new Map();this.rings=[];this.crystals=[];this.slots=[];this.piles=[];this.ray=new T.Raycaster();this.pointer=new T.Vector2();this.pointerEvent=null;this.pointerInside=false;this.lastRender=0;this.needs=true;this.animatingUntil=0;this.motion=true;this.disposed=false;
   this.build();this.turnTint=new T.Mesh(new T.PlaneGeometry(14.3,6.9),new T.MeshBasicMaterial({color:0xd5dfdf,transparent:true,opacity:.085,depthWrite:false}));this.turnTint.rotation.x=-Math.PI/2;this.turnTint.position.y=.18;this.scene.add(this.turnTint);this.mergeStatic();this.resize();
   this.observer=new ResizeObserver(()=>this.resize());this.observer.observe(canvas.parentElement);
   canvas.addEventListener('pointermove',e=>this.pick(e,false));canvas.addEventListener('pointerleave',()=>{this.pointerInside=false;this.pointerEvent=null;this.hover=null;this.hoverPile=null;this.hoverSlot=null;this.onCardHover?.(null);this.invalidate(250);canvas.style.cursor='default';});canvas.addEventListener('click',e=>this.pick(e,true));
@@ -219,7 +219,10 @@ export class Arena {
    const level=node.querySelector('.powerValue')?.textContent||'Lv. 1';
    const p=new T.Vector3(slot.position.x,.51,slot.position.z).project(this.camera);
    if(p.z< -1||p.z>1)continue;
-   const badge=document.createElement('span');badge.className='arenaLevelBadge'+(node.classList.contains('attackAttacker')||node.classList.contains('attackTarget')?' isSideways':'');badge.textContent=level.replace(/^Lv\.?\s*/, 'Lv. ');
+   const base=Number(node.dataset.basePower),mod=Number(node.dataset.tempMod);
+   const badge=document.createElement('span');badge.className='arenaLevelBadge'+(node.classList.contains('attackAttacker')||node.classList.contains('attackTarget')?' isSideways':'')+(base===0?' baseZero':'');
+   const current=document.createElement('span');current.className='arenaCurrentPower';current.textContent=level.replace(/^Lv\.?\s*/, 'Lv. ');badge.append(current);
+   if(node.dataset.tempActive==='true'){const detail=document.createElement('span');detail.className='arenaBasePower';detail.textContent='元Lv. '+base+' ／ 一時'+(mod>0?'+':mod===0?'±':'')+mod;badge.append(detail);}
    badge.style.left=((p.x+1)*w/2)+'px';badge.style.top=((1-p.y)*h/2)+'px';this.labels.append(badge);
   }
  }

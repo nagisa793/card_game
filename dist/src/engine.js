@@ -4,7 +4,7 @@
 
 var cardSeed = 1;
 var charSeed = 1;
-var match = {scoreA:0, scoreB:0, gameNo:1, mode:'manual'};
+var match = {scoreA:0, scoreB:0, gameNo:1, mode:'com'};
 var game = null;
 var undoStack = [];
 var redoStack = [];
@@ -12,6 +12,19 @@ var historyLimit = 100;
 var COM_DELAY = 3000;
 var comTimer = null;
 var comTimerToken = 0;
+var victorySoundPending=false;
+var victoryDelayUntil=0;
+var victoryReadyTimer=null;
+function nextGameReady(){return !victorySoundPending && Date.now()>=victoryDelayUntil;}
+window.addEventListener('duel:victory-se-start',function(){
+  victorySoundPending=true;victoryDelayUntil=0;cancelComTimer();
+});
+window.addEventListener('duel:victory-se-end',function(){
+  victorySoundPending=false;victoryDelayUntil=Date.now()+1000;
+  clearTimeout(victoryReadyTimer);
+  var finishedGame=game;
+  victoryReadyTimer=setTimeout(function(){if(game===finishedGame){render();}},1000);
+});
 var uiPrefs = {motion:'normal',cinematics:true,chainCollapsed:true,historyCollapsed:false};
 var chainAutoOpened = false;
 var inspectorRestoreTimer = null;
@@ -28,7 +41,6 @@ var settingsCloseBtn = document.getElementById('settingsCloseBtn');
 var cinematicsToggle = document.getElementById('cinematicsToggle');
 var chainToggleBtn = document.getElementById('chainToggleBtn');
 var historyToggleBtn = document.getElementById('historyToggleBtn');
-var startBtn = document.getElementById('startBtn');
 var comStartBtn = document.getElementById('comStartBtn');
 var autoStartBtn = document.getElementById('autoStartBtn');
 var undoBtn = document.getElementById('undoBtn');
@@ -483,21 +495,23 @@ function captureSnapshot(){
   return historyStringify({
     game:game, match:match, cardSeed:cardSeed, charSeed:charSeed,
     phase:phaseEl.textContent, status:statusEl.textContent,
-    score:scoreEl.textContent, startText:startBtn.textContent,
+    score:scoreEl.textContent,
     logHtml:logEl.innerHTML
   });
 }
 function restoreSnapshot(snapshot){
   cancelComTimer();
+  victorySoundPending=false;victoryDelayUntil=0;clearTimeout(victoryReadyTimer);
+  var playbackPaused=game && game.mode==='auto' ? !!game.autoPaused : false;
   var data = historyParse(snapshot);
   game = data.game;
+  if(game && game.mode==='auto')game.autoPaused=playbackPaused;
   match = data.match;
   cardSeed = data.cardSeed;
   charSeed = data.charSeed;
   phaseEl.textContent = data.phase;
   statusEl.textContent = data.status;
   scoreEl.textContent = data.score;
-  startBtn.textContent = data.startText;
   logEl.innerHTML = data.logHtml;
   logEl.scrollTop = 0;
   render();
@@ -531,7 +545,8 @@ function battleHtml(p){
       out += '<div class="slot empty" data-zone="battle" data-player="'+pKey+'" data-slot="'+i+'"><span class="zoneSlotNumber">' + (i+1) + '</span></div>';
       continue;
     }
-    var mod = game && game.attack ? (game.attack.mods[c.uid] || 0) : 0;
+    var hasMod = !!(game && game.attack && Object.prototype.hasOwnProperty.call(game.attack.mods,c.uid));
+    var mod = hasMod ? game.attack.mods[c.uid] : 0;
     var power = Math.max(0,c.level+mod);
     var powerClass = mod>0 ? ' powerUp' : (mod<0 ? ' powerDown' : '');
     var targetClass = game && game.attack && playerKey(p)===game.attack.defenderKey && c.uid===game.attack.targetUid ? ' attackTarget' : '';
@@ -544,14 +559,13 @@ function battleHtml(p){
       if(pKey===game.turnKey && game.choice.attackers && game.choice.attackers.has(c.uid)) attackerClass=' attackAttacker';
       if(pKey!==game.turnKey && Number(game.choice.targetUid)===Number(c.uid)) targetClass=' attackTarget';
     }
-    out += '<div class="slot char type-character' + powerClass + targetClass + attackerClass + choiceTargetClass + '" data-zone="battle" data-player="'+pKey+'" data-slot="'+i+'" data-uid="'+Number(c.uid)+'"'+cardInspectAttrs(c,power)+'><span class="zoneSlotNumber">' + (i+1) + '</span><span class="cardMiniType">CHAR</span>'+cardSigilHtml()+'<span class="cardMiniName">' + esc(c.name) + '</span><span class="powerValue">Lv. ' + power + '</span>';
-    if(mod) out += '<div class="powerBase">元Lv. ' + c.level + '（' + (mod>0?'+':'') + mod + '）</div>';
+    out += '<div class="slot char type-character' + powerClass + targetClass + attackerClass + choiceTargetClass + '" data-zone="battle" data-player="'+pKey+'" data-slot="'+i+'" data-uid="'+Number(c.uid)+'" data-base-power="'+Number(c.level)+'" data-temp-mod="'+Number(mod)+'" data-temp-active="'+(hasMod?'true':'false')+'"'+cardInspectAttrs(c,power)+'><span class="zoneSlotNumber">' + (i+1) + '</span><span class="cardMiniType">CHAR</span>'+cardSigilHtml()+'<span class="cardMiniName">' + esc(c.name) + '</span><span class="powerValue">Lv. ' + power + '</span>';
+    if(hasMod) out += '<div class="powerBase">元Lv. ' + c.level + '（一時' + (mod>0?'+':mod===0?'±':'') + mod + '）</div>';
     out += '</div>';
   }
   return out;
 }
 function hideTrapDetails(p){
-  if(game.mode==='manual')return playerKey(p)!==(game.responseActorKey||game.standbyKey||game.turnKey||'A');
   return game.mode==='auto'||p===game.B;
 }
 function tacticHtml(p,hideSetTraps){
@@ -608,7 +622,7 @@ function hiddenHandHtml(p){
   if(!hand.length) return '';
   return hand.map(function(card){
     var atk=game.attack,ack=atk&&atk.pendingPeekAcknowledgementIndex,entry=ack!=null?atk.chainHistory[ack]:null;
-    if(entry&&entry.actorKey==='A'&&(entry.payload.ids||[]).indexOf(card.cid)>=0)return '<div class="card own '+cardTypeClass(card)+'"'+cardInspectAttrs(card)+'>'+compactCardHtml(card)+'</div>';
+    if(game.mode==='com'&&entry&&entry.actorKey==='A'&&(entry.payload.ids||[]).indexOf(card.cid)>=0)return '<div class="card own '+cardTypeClass(card)+'"'+cardInspectAttrs(card)+'>'+compactCardHtml(card)+'</div>';
     return '<div class="cardBack'+(game.choice.effect.has(card.cid)?' selected':'')+'" data-hidden-card="true" data-cid="'+card.cid+'">非公開</div>';
   }).join('');
 }
@@ -683,6 +697,7 @@ function chainTargetDescription(entry){
     return '生還対象：'+(target||'指定キャラなし')+'／配置先：'+destination;
   }
   if(entry.kind==='peek2'){
+    if(game.mode==='auto'||entry.actorKey==='B')return '確認対象：'+op.name+'の戦術手札から最大2枚';
     selected=(payload.revealedLabels||[]).slice();
     if(!selected.length) selected=(payload.ids||[]).map(function(cid){return cardReference(op,cid);}).filter(Boolean);
     return selected.length ? '確認対象：'+op.name+'の戦術手札「'+selected.join('」／「')+'」' : '確認対象：'+op.name+'の戦術手札から効果処理時に最大2枚';
@@ -747,6 +762,7 @@ function chainPanelHtml(){
       return;
     }
     if(event.type==='pass'){
+      if(resolving)return; // Keep the current card directly above the next effect while resolving.
       html += '<div class="chainItem pass player-'+eventActor+'"><div class="chainHead"><span class="chainPlayer">'+esc(event.player)+'</span><span class="chainState">連鎖外</span></div><div class="chainCardName">PASS　パス</div>'+
         '<div class="chainTarget">カード発動なし</div></div>';
       return;
@@ -846,7 +862,7 @@ function inspectorFromNode(node){
 }
 function updateInspectorFromState(){
   if(!game){
-    setInspector('','対戦開始待ち','上部の「両者手動」または「対COMバージョン」から対戦を始めてください。');
+    setInspector('','対戦開始待ち','上部の「対COMバージョン」または「COM同士を観戦」から対戦を始めてください。');
     return;
   }
   var atk=game.attack,entry=null;
@@ -1013,10 +1029,12 @@ function keepFlowRailCurrentVisible(){
     if(!scroller)return;
     var current=scroller.querySelector('.resolving')||scroller.querySelector('.resolvedNow')||scroller.querySelector('.resolvingNext');
     if(!current)return;
-    var rect=current.getBoundingClientRect(),box=scroller.getBoundingClientRect();
-    var top=rect.top-box.top+scroller.scrollTop-8,bottom=rect.bottom-box.top+scroller.scrollTop;
-    if(top<scroller.scrollTop)scroller.scrollTop=Math.max(0,top);
-    else if(bottom>scroller.scrollTop+scroller.clientHeight)scroller.scrollTop=Math.max(0,bottom-scroller.clientHeight+8);
+    var next=scroller.querySelector('.resolvingNext');
+    if(next===current)next=Array.from(scroller.querySelectorAll('.activeChainItem.pending')).find(function(node){return !!(current.compareDocumentPosition(node)&Node.DOCUMENT_POSITION_FOLLOWING);});
+    var anchor=next||current,rect=anchor.getBoundingClientRect(),box=scroller.getBoundingClientRect();
+    // Keep the upcoming card at the bottom, leaving the current card just above it.
+    var bottom=rect.bottom-box.top+scroller.scrollTop;
+    scroller.scrollTop=Math.max(0,bottom-scroller.clientHeight+8);
   });
 }
 function saveUiPrefs(){
@@ -1047,20 +1065,15 @@ function applyUiPrefs(){
 function updateModeUi(){
   var mode=game ? game.mode : match.mode;
   var isCom=mode==='com';
-  simTitleEl.textContent=mode==='auto' ? '盤面シミュレーター（COM同士・全情報公開）' : isCom ? '盤面シミュレーター（対COM・相手情報非公開）' : '盤面シミュレーター（両者手動・全情報公開）';
-  modeFooterEl.textContent=mode==='auto' ? 'COM AとCOM Bが3秒ごとに一手ずつ進めます。両者の手札を表示し、マッチ終了まで自動で進みます。' : isCom
-    ? '対COM版です。あなたは下側を操作します。COMの手札と伏せ罠は非公開で、COMは3秒ごとに一手進めます。'
-    : 'これはルール検証用シミュレーターです。AさんとBさんの判断はすべて手動で操作します。本来は非公開の相手の手札・伏せ札も含めて全情報を表示しています。';
-  startBtn.textContent=game && game.mode==='manual' ? '両者手動をやり直す' : '両者手動で開始';
+  simTitleEl.textContent=mode==='auto' ? '盤面シミュレーター（COM同士を観戦）' : '盤面シミュレーター（対COM）';
+  modeFooterEl.textContent=mode==='auto' ? 'COM AとCOM Bが3秒ごとに一手ずつ進めます。相手側の手札と伏せ罠は非公開です。' : 'あなたは下側を操作します。COMの手札と伏せ罠は非公開で、COMは3秒ごとに一手進めます。';
   comStartBtn.textContent=game && game.mode==='com' ? '対COMをやり直す' : '対COMバージョン';
   autoStartBtn.textContent=game && game.mode==='auto' ? 'COM同士をやり直す' : 'COM同士を観戦';
   var autoPauseBtn=document.getElementById('autoPauseBtn');
   autoPauseBtn.hidden=!(game&&game.mode==='auto'&&game.state!=='matchOver');
   autoPauseBtn.textContent=game&&game.autoPaused?'▶ 再生':'⏸ 一時停止';
   autoPauseBtn.setAttribute('aria-label',game&&game.autoPaused?'COM同士の対戦を再生':'COM同士の対戦を一時停止');
-  scoreEl.textContent=mode==='auto' ? '対戦成績：COM A '+match.scoreA+'勝 ／ COM B '+match.scoreB+'勝' : isCom
-    ? '対戦成績：あなた '+match.scoreA+'勝 ／ COM '+match.scoreB+'勝'
-    : '対戦成績：'+match.scoreA+' vs '+match.scoreB;
+  scoreEl.textContent=mode==='auto' ? '対戦成績：COM A '+match.scoreA+'勝 ／ COM B '+match.scoreB+'勝' : '対戦成績：あなた '+match.scoreA+'勝 ／ COM '+match.scoreB+'勝';
 }
 function updateAttackingSideHighlight(){
   var attackingKey=(!game||game.state==='gameOver'||game.state==='matchOver')?null:(game.attack?game.attack.attackerKey:game.turnKey);
@@ -1083,7 +1096,7 @@ function render(){
     var oppHandType=game.B.tacticSelected?'戦術手札':'メイン手札';
     document.getElementById('ownHandLabel').textContent='自分（'+game.A.name+'・'+ownRole+'）の'+ownHandType;
     document.getElementById('ownBattleLabel').textContent='自分（'+game.A.name+'・'+ownRole+'）のバトルエリア';
-    document.getElementById('oppHandLabel').textContent='相手（'+game.B.name+'・'+oppRole+'）の'+oppHandType+(game.mode==='com'?'（非公開）':'');
+    document.getElementById('oppHandLabel').textContent='相手（'+game.B.name+'・'+oppRole+'）の'+oppHandType+'（非公開）';
     document.getElementById('oppBattleLabel').textContent='相手（'+game.B.name+'・'+oppRole+'）のバトルエリア';
     document.getElementById('ownBattle').innerHTML = battleHtml(game.A);
     document.getElementById('ownTactic').innerHTML = tacticHtml(game.A,hideTrapDetails(game.A));
@@ -1101,7 +1114,7 @@ function render(){
     document.getElementById('oppTacticDeck').innerHTML = pileHtml(tacticDeckView(game.B),true);
     document.getElementById('oppRetreat').innerHTML = pileHtml(game.B.retreat,false);
     document.getElementById('oppExclusion').innerHTML = pileHtml(game.B.exclusion,false);
-    document.getElementById('oppHand').innerHTML = game.mode==='com' ? hiddenHandHtml(game.B) : handHtml(game.B);
+    document.getElementById('oppHand').innerHTML = hiddenHandHtml(game.B);
   }else{
     ['ownBattle','ownTactic','ownMainDeck','ownTacticDeck','ownRetreat','ownExclusion','ownHand','ownSelectedTacticHand',
       'oppBattle','oppTactic','oppMainDeck','oppTacticDeck','oppRetreat','oppExclusion','oppHand'].forEach(function(id){
@@ -1138,25 +1151,27 @@ function cancelComTimer(){
 }
 function startMatch(mode, firstKey){
   cancelComTimer();
-  match = {scoreA:0,scoreB:0,gameNo:1,mode:mode||'manual'};
+  match = {scoreA:0,scoreB:0,gameNo:1,mode:mode||'com'};
   logEl.innerHTML = '';
   startGame(match.mode, firstKey);
 }
 function startGame(mode, firstKeyOverride){
   cancelComTimer();setupTransitionPending=false;
+  victorySoundPending=false;victoryDelayUntil=0;clearTimeout(victoryReadyTimer);
   chainAutoOpened=false;uiPrefs.chainCollapsed=true;applyUiPrefs();
-  mode=mode || match.mode || 'manual';
+  mode=mode==='auto'?'auto':'com';
   var firstKey = firstKeyOverride==='A'||firstKeyOverride==='B' ? firstKeyOverride : (Math.random()<0.5 ? 'A' : 'B');
   game = {
-    A:newPlayer(mode==='auto'?'COM A':mode==='com'?'あなた':'Aさん',firstKey==='A',A_CHAR_NAMES),
-    B:newPlayer(mode==='auto'?'COM B':mode==='com'?'COM':'Bさん',firstKey==='B',B_CHAR_NAMES),
+    A:newPlayer(mode==='auto'?'COM A':'あなた',firstKey==='A',A_CHAR_NAMES),
+    B:newPlayer(mode==='auto'?'COM B':'COM',firstKey==='B',B_CHAR_NAMES),
     mode:mode, humanKey:'A', comKey:'B', firstKey:firstKey, isDraw:false,
-    state:mode==='com'||mode==='auto'?'coinToss':'standby', standbyKey:null, turnKey:null, turnCount:0,
+    state:'coinToss', standbyKey:null, turnKey:null, turnCount:0,
     attack:null, lastChainHistory:[], lastChainDisplayHistory:[],
     responseActorKey:null, penalty:null, tieChoice:null, choice:null,
     humanTacticSelection:new Set(), humanTacticsReady:false, pendingSetupAction:null
   };
   clearChoice();
+  window.dispatchEvent(new CustomEvent('duel:game-start'));
   gameHeader('ゲーム' + match.gameNo);
   var first=playerByKey(firstKey);
   var second=other(first);
@@ -1227,8 +1242,25 @@ function confirmMulligan(){
   render();
 }
 function drawOpeningTactics(p){
-  p.tacticHand = p.tacticDeck.splice(0,7);
-  p.tacticDrawPool = p.tacticDeck.splice(0);
+  var likelyCharacters=p.battleArea.concat(p.mainHand.filter(function(c){return c.type==='character';}));
+  var named=new Set(likelyCharacters.map(function(c){return c.name;}));
+  var priority={buff1:110,debuff1:108,buffAll1:98,debuffAll1:97,negateTrap:95,supportDefense:86,redirect:83,drawTactic2:78,revive:70,lastStand:65,strategyShift:62,recycle:50,peek2:35};
+  var ranked=p.tacticDeck.slice().sort(function(a,b){
+    function value(c){
+      if(c.kind==='namedShift')return named.has(c.targetName)?115:32;
+      var score=priority[c.kind]||55;
+      if(c.kind==='supportDefense'&&likelyCharacters.length<2)score=45;
+      if(c.kind==='lastStand'&&likelyCharacters.length===1)score=90;
+      if(c.kind==='revive'&&!p.retreat.length)score=55;
+      if(c.chain)score+=9;
+      return score;
+    }
+    return value(b)-value(a);
+  });
+  p.tacticHand=ranked.slice(0,7);
+  var selected=new Set(p.tacticHand.map(function(c){return c.cid;}));
+  p.tacticDrawPool=shuffle(p.tacticDeck.filter(function(c){return !selected.has(c.cid);}));
+  p.tacticDeck=[];
   p.openingTacticsReady=true;
   p.tacticSelected = p.standbyComplete;
   log(p.name + '：戦術デッキから最初の手札を7枚ドロー');
@@ -1332,6 +1364,7 @@ function autoSelectOpeningTactics(){
 function comActionPending(){
   if(!game || (game.mode!=='com' && game.mode!=='auto')) return false;
   if(game.autoPaused) return false;
+  if(game.state==='gameOver'&&!nextGameReady())return false;
   if(game.mode==='auto') return ['coinToss','standby','mulliganConfirm','turnDraw','attackDeclare','response','chain','resolving','penalty','tieChoice','gameOver'].indexOf(game.state)!==-1;
   if(game.state==='coinToss') return true;
   if(game.state==='standby') return game.standbyKey==='B';
@@ -1353,7 +1386,7 @@ function queueComIfNeeded(){
     recordHistory();
     runComStep();
     render();
-  },COM_DELAY);
+  },game.state==='gameOver'&&game.mode==='auto'?Math.max(0,victoryDelayUntil-Date.now()):COM_DELAY);
 }
 function runComStep(){
   if(game.state==='coinToss'){
@@ -1376,6 +1409,7 @@ function runComStep(){
   }else if(game.state==='tieChoice'){
     comTieChoiceStep();
   }else if(game.state==='gameOver' && game.mode==='auto'){
+    if(!nextGameReady())return;
     match.gameNo++;
     startGame('auto');
   }
@@ -1392,49 +1426,49 @@ function discardStandbyCard(p,c){
 }
 function comStandbyStep(){
   var p=playerByKey(game.standbyKey);
-  if(!p.mainHand.length){finishStandby();return;}
-  var ordered=cardsInTypeOrder(p.mainHand),c,target,deckChar,topTrap,others;
-  c=ordered.find(function(x){return x.type==='character' && p.battleArea.length<5;});
-  if(c){prepareComStandbyChoice(c);summonCharacter(p,c,openBattleSlotIndexes(p,false)[0]);return;}
-  c=ordered.find(function(x){return x.type==='exp' && (x.kind==='summon'||x.kind==='summonShuffleDraw') && p.battleArea.length<5 && p.mainDeck.some(function(d){return d.type==='character';});});
-  if(c){
-    deckChar=p.mainDeck.filter(function(x){return x.type==='character';})[0];
-    prepareComStandbyChoice(c);specialSummon(p,c,deckChar.cid,openBattleSlotIndexes(p,false)[0]);return;
-  }
-  c=ordered.find(function(x){return x.type==='exp' && x.kind==='searchCharacter' && p.mainDeck.some(function(d){return d.type==='character';});});
-  if(c){
-    deckChar=p.mainDeck.filter(function(x){return x.type==='character';})[0];
-    prepareComStandbyChoice(c);searchCharacterToHand(p,c,deckChar.cid);return;
-  }
-  c=ordered.find(function(x){return x.type==='exp' && x.kind==='growth' && p.battleArea.some(function(ch){return ch.level<3;});});
-  if(c){
-    target=p.battleArea.filter(function(ch){return ch.level<3;}).sort(function(a,b){return a.level-b.level;})[0];
-    prepareComStandbyChoice(c);useExpansionTarget(p,c,target.uid);return;
-  }
-  c=ordered.find(function(x){return x.type==='trap' && tacticSlotsOpen(p)>0;});
-  if(c){prepareComStandbyChoice(c);setTrap(p,c);return;}
-  c=ordered.find(function(x){return x.type==='exp' && x.kind==='defensePrep';});
-  if(c){
-    topTrap=p.mainDeck.slice(0,3).find(function(x){return x.type==='trap';});
-    prepareComStandbyChoice(c);resolveDefensePrep(p,c,topTrap&&tacticSlotsOpen(p)>0?topTrap.cid:null);return;
-  }
-  c=ordered.find(function(x){return x.type==='exp' && x.kind==='draw2discard2' && p.mainHand.length>=3;});
-  if(c){
-    others=p.mainHand.filter(function(x){return x.cid!==c.cid;}).sort(function(a,b){return comDiscardPriority(b,p)-comDiscardPriority(a,p);}).slice(0,2);
-    prepareComStandbyChoice(c);
-    choice().discard=new Set(others.map(function(x){return x.cid;}));
-    resolveDrawTwo(p,c);return;
-  }
-  c=ordered.find(function(x){return x.type==='exp' && x.kind==='draw1';});
-  if(c){prepareComStandbyChoice(c);resolveDrawOne(p,c);return;}
-  c=ordered.find(function(x){return x.type==='exp';});
-  if(c){
-    prepareComStandbyChoice(c);
-    if(c.kind==='summon'||c.kind==='summonShuffleDraw') finishExpansionAfterSummon(p,c);
-    else consumeStandbyCard(p,c);
-    log(p.name+'：'+label(c)+'を対象なしで処理');
+  if(choice().expansionActivated){
+    var active=findCard(p.tempPlayed,choice().standbyCard),target,deckChar,topTrap,others;
+    if(!active){clearChoice();return;}
+    if(active.kind==='summon'||active.kind==='summonShuffleDraw'){
+      deckChar=p.mainDeck.find(function(x){return x.type==='character';});
+      var battleSlot=openBattleSlotIndexes(p,false)[0];
+      if(deckChar&&battleSlot!=null)specialSummon(p,active,deckChar.cid,battleSlot);
+      else finishExpansionAfterSummon(p,active);
+    }else if(active.kind==='searchCharacter'){
+      deckChar=p.mainDeck.find(function(x){return x.type==='character';});
+      if(deckChar)searchCharacterToHand(p,active,deckChar.cid);else consumeStandbyCard(p,active);
+    }else if(active.kind==='growth'){
+      target=p.battleArea.filter(function(ch){return ch.level<3;}).sort(function(a,b){return a.level-b.level;})[0];
+      if(target)useExpansionTarget(p,active,target.uid);else consumeStandbyCard(p,active);
+    }else if(active.kind==='defensePrep'){
+      topTrap=p.mainDeck.slice(0,3).find(function(x){return x.type==='trap';});
+      resolveDefensePrep(p,active,topTrap&&tacticSlotsOpen(p)>0?topTrap.cid:null);
+    }else if(active.kind==='draw2discard2'){
+      others=p.mainHand.slice().sort(function(a,b){return comDiscardPriority(b,p)-comDiscardPriority(a,p);}).slice(0,2);
+      if(others.length===2){choice().discard=new Set(others.map(function(x){return x.cid;}));resolveDrawTwo(p,active);}
+      else consumeStandbyCard(p,active);
+    }else if(active.kind==='draw1')resolveDrawOne(p,active);
+    else consumeStandbyCard(p,active);
     return;
   }
+  if(!p.mainHand.length){finishStandby();return;}
+  var ordered=cardsInTypeOrder(p.mainHand),c;
+  c=ordered.find(function(x){return x.type==='character' && p.battleArea.length<5;});
+  if(c){prepareComStandbyChoice(c);summonCharacter(p,c,openBattleSlotIndexes(p,false)[0]);return;}
+  c=ordered.find(function(x){return x.type==='exp' && (x.kind==='summon'||x.kind==='summonShuffleDraw') && p.battleArea.length<5 && p.mainDeck.some(function(d){return d.type==='character';}) && tacticSlotsOpen(p)>0;});
+  if(c){prepareComStandbyChoice(c);activateExpansion(p,c,firstOpenTacticSlot(p),true);return;}
+  c=ordered.find(function(x){return x.type==='exp' && x.kind==='searchCharacter' && p.mainDeck.some(function(d){return d.type==='character';}) && tacticSlotsOpen(p)>0;});
+  if(c){prepareComStandbyChoice(c);activateExpansion(p,c,firstOpenTacticSlot(p),true);return;}
+  c=ordered.find(function(x){return x.type==='exp' && x.kind==='growth' && p.battleArea.some(function(ch){return ch.level<3;}) && tacticSlotsOpen(p)>0;});
+  if(c){prepareComStandbyChoice(c);activateExpansion(p,c,firstOpenTacticSlot(p),true);return;}
+  c=ordered.find(function(x){return x.type==='trap' && tacticSlotsOpen(p)>0;});
+  if(c){prepareComStandbyChoice(c);setTrap(p,c);return;}
+  c=ordered.find(function(x){return x.type==='exp' && x.kind==='defensePrep' && tacticSlotsOpen(p)>0;});
+  if(c){prepareComStandbyChoice(c);activateExpansion(p,c,firstOpenTacticSlot(p),true);return;}
+  c=ordered.find(function(x){return x.type==='exp' && x.kind==='draw2discard2' && p.mainHand.length>=3 && tacticSlotsOpen(p)>0;});
+  if(c){prepareComStandbyChoice(c);activateExpansion(p,c,firstOpenTacticSlot(p),true);return;}
+  c=ordered.find(function(x){return x.type==='exp' && x.kind==='draw1' && tacticSlotsOpen(p)>0;});
+  if(c){prepareComStandbyChoice(c);activateExpansion(p,c,firstOpenTacticSlot(p),true);return;}
   discardStandbyCard(p,ordered[0]);
 }
 function comDiscardPriority(c,p){
@@ -1447,16 +1481,18 @@ function comDiscardPriority(c,p){
 function comDeclareAttack(){
   var p=playerByKey(game.turnKey),op=other(p),best=null,n=p.battleArea.length;
   if(!n || !op.battleArea.length){attackPass();return;}
+  var possibleBoost=p.tacticHand.some(function(c){return c.kind==='buff1'||c.kind==='debuff1'||c.kind==='buffAll1'||c.kind==='debuffAll1'||c.kind==='namedShift';});
   op.battleArea.forEach(function(target){
     for(var mask=1;mask<(1<<n);mask++){
       var attackers=[],sum=0;
       for(var i=0;i<n;i++) if(mask&(1<<i)){attackers.push(p.battleArea[i]);sum+=p.battleArea[i].level;}
       if(attackers.length>1 && sum>target.level+1) continue;
       var score;
-      if(sum>target.level) score=120+target.level*12-sum-attackers.length*3;
+      if(sum<target.level&&!possibleBoost)continue;
+      if(sum>target.level) score=140+target.level*8-(sum-target.level)*8-attackers.length*8;
       else if(sum===target.level && attackers.length===1) score=65+target.level*4;
       else if(sum===target.level) score=48+target.level*3-attackers.length*2;
-      else score=10-(target.level-sum)*8-attackers.length;
+      else score=35+target.level*4-(target.level-sum)*8-attackers.length*3;
       score+=Math.random()*2;
       if(!best || score>best.score) best={score:score,target:target,attackers:attackers};
     }
@@ -1491,10 +1527,33 @@ function comReservedReviveTargetUids(actor){
   if(!game) return new Set();
   return reservedReviveTargetUids(actor);
 }
+function comProjectedBattleTotals(){
+  var atk=game.attack,power={};
+  [game.A,game.B].forEach(function(p){p.battleArea.forEach(function(ch){power[ch.uid]=ch.level+(atk.mods[ch.uid]||0);});});
+  atk.chainHistory.forEach(function(entry){
+    if(entry.negated||entry.status!=='pending')return;
+    var id=Number(entry.payload?.targetUid),actor=playerByKey(entry.actorKey),op=other(actor);
+    if(entry.kind==='buff1'||entry.kind==='debuff1'||entry.kind==='levelDown'){
+      if(power[id]!=null)power[id]+=entry.kind==='buff1'?1:-1;
+    }else if(entry.kind==='namedShift'){
+      if(power[id]!=null)power[id]+=findChar(actor,id)?2:-2;
+    }else if(entry.kind==='buffAll1'||entry.kind==='debuffAll1'){
+      attackParticipants(entry.kind==='buffAll1'?entry.actorKey:playerKey(op)).forEach(function(ch){power[ch.uid]+=entry.kind==='buffAll1'?1:-1;});
+    }else if(entry.kind==='supportDefense'){
+      var helper=Number(entry.payload?.targetUid),recipient=Number(entry.payload?.recipientUid);
+      if(power[helper]!=null)power[helper]--;
+      if(power[recipient]!=null)power[recipient]++;
+    }else if(entry.kind==='lastStand'){
+      var own=attackParticipants(entry.actorKey),enemy=attackParticipants(playerKey(op));
+      if(own.length===1&&enemy.length>=2)power[own[0].uid]+=2;
+    }
+  });
+  return {A:attackParticipants('A').reduce(function(sum,ch){return sum+Math.max(0,power[ch.uid]??ch.level);},0),B:attackParticipants('B').reduce(function(sum,ch){return sum+Math.max(0,power[ch.uid]??ch.level);},0)};
+}
 function comResponsePlan(info){
   var card=info.card,kind=card.kind,atk=game.attack,actor=playerByKey(game.responseActorKey),op=other(actor),actorKey=playerKey(actor),opKey=playerKey(op);
   var own=attackParticipants(actorKey),enemy=attackParticipants(opKey),ownBoard=actor.battleArea.slice(),enemyBoard=op.battleArea.slice(),payload={},score=0,target,targets,index;
-  var ownTotal=attackTotal(actorKey),enemyTotal=attackTotal(opKey),needsPower=ownTotal<=enemyTotal;
+  var projected=comProjectedBattleTotals(),ownTotal=projected[actorKey],enemyTotal=projected[opKey],needsPower=ownTotal<=enemyTotal;
   if(info.src==='tactic'){
     var openZoneSlots=openTacticSlotIndexes(actor);
     if(!openZoneSlots.length)return null;
@@ -1507,15 +1566,17 @@ function comResponsePlan(info){
   }else if(kind==='buffAll1'||kind==='debuffAll1'){
     if(!(kind==='buffAll1'?own.length:enemy.length))return null;score=needsPower?100:38;
   }else if(kind==='namedShift'){
-    targets=ownBoard.filter(function(x){return x.name===card.targetName;});
+    targets=own.filter(function(x){return x.name===card.targetName;});
     target=strongestCharacter(targets);
-    if(!target){targets=enemyBoard.filter(function(x){return x.name===card.targetName;});target=strongestCharacter(targets);}
+    if(!target){targets=enemy.filter(function(x){return x.name===card.targetName;});target=strongestCharacter(targets);}
     if(!target)return null;payload.targetUid=target.uid;score=needsPower?110:45;
   }else if(kind==='redirect'){
     targets=playerByKey(atk.defenderKey).battleArea.filter(function(x){return x.uid!==atk.targetUid;});
     if(!targets.length)return null;
     target=atk.attackerKey===actorKey?weakestCharacter(targets):strongestCharacter(targets);
-    payload.targetUid=target.uid;score=72;
+    var oldTarget=findChar(playerByKey(atk.defenderKey),atk.targetUid);
+    if(!oldTarget || atk.attackerKey===actorKey && currentBattlePower(target)>=currentBattlePower(oldTarget) || atk.defenderKey===actorKey && currentBattlePower(target)<=currentBattlePower(oldTarget))return null;
+    payload.targetUid=target.uid;score=needsPower?78:55;
   }else if(kind==='revive'){
     var reviveSlots=openBattleSlotIndexes(actor,true);
     if(!reviveSlots.length)return null;
@@ -1529,12 +1590,12 @@ function comResponsePlan(info){
     target=strongestCharacter(actor.retreat.filter(function(x){return (x.type==='character'||x.name)&&!reservedTrapReviveTargets.has(Number(x.uid));}));
     if(!target)return null;payload.targetUid=target.uid;payload.battleSlot=trapReviveSlots[0];score=74;
   }else if(kind==='peek2'){
-    if(!op.tacticHand.length)return null;score=32;
+    if(!op.tacticHand.length)return null;score=needsPower?12:40;
   }else if(kind==='drawTactic2'){
     if(!actor.tacticDrawPool.length)return null;score=actor.tacticHand.length<=3?82:46;
   }else if(kind==='recycle'){
     target=actor.retreat.find(function(x){return x.type==='tactic';});
-    if(!target)return null;payload.ids=[target.cid];score=55;
+    if(!target)return null;payload.ids=[target.cid];score=needsPower?18:55;
   }else if(kind==='strategyShift'){
     var reservedTactics=comReservedTacticCids(actor);
     var shiftCandidates=actor.tacticHand.filter(function(x){return x.cid!==card.cid&&!reservedTactics.has(Number(x.cid));});
@@ -1564,9 +1625,10 @@ function comResponsePlan(info){
   }else if(kind==='lockZone'){
     var lockTargets=lockableZoneSlotIndexes(op);
     if(!lockTargets.length)return null;
-    payload.lockSlot=lockTargets[0];score=60;
+    payload.lockSlot=lockTargets[0];score=needsPower?15:65;
   }else if(kind==='skipAttack'){
-    score=60;
+    if(op.skipNextAttack||!op.battleArea.length)return null;
+    score=needsPower?12:62;
   }else{
     score=45;
   }
@@ -1581,7 +1643,7 @@ function comResponseStep(){
     return open>0&&!reservedTactics.has(Number(x.cid));
   });
   var plans=cards.map(function(x){return comResponsePlan({src:x.type==='trap'?'trap':'tactic',card:x});}).filter(Boolean).sort(function(a,b){return b.score-a.score;});
-  var ownTotal=attackTotal(playerKey(actor)),enemyTotal=attackTotal(playerKey(other(actor)));
+  var projected=comProjectedBattleTotals(),ownTotal=projected[playerKey(actor)],enemyTotal=projected[playerKey(other(actor))];
   var threshold=isChain?50:(ownTotal<=enemyTotal?30:56);
   if(!plans.length||plans[0].score<threshold){
     if(isChain)endChain();else responsePass();
@@ -1657,7 +1719,7 @@ function renderControls(){
   if(game.mode==='auto'){
     var actor=game.state==='standby'?playerByKey(game.standbyKey):game.state==='response'||game.state==='chain'?playerByKey(game.responseActorKey):game.state==='turnDraw'||game.state==='attackDeclare'?playerByKey(game.turnKey):null;
     html+='<div class="controlsText"><span class="modeBadge">COM同士の自動対戦</span></div>';
-    html+='<div class="valueBox">'+esc(game.state==='matchOver'?'マッチ終了':game.state==='gameOver'?'3秒後に次のゲームへ':game.state==='coinToss'?'先攻後攻の抽選結果を表示中':actor?actor.name+'が思考中':'効果と攻撃結果を処理中')+'</div>';
+    html+='<div class="valueBox">'+esc(game.state==='matchOver'?'マッチ終了':game.state==='gameOver'?'勝利SE終了の1秒後に次のゲームへ':game.state==='coinToss'?'先攻後攻の抽選結果を表示中':actor?actor.name+'が思考中':'効果と攻撃結果を処理中')+'</div>';
     if(game.state!=='matchOver')html+='<div class="controlsText">'+(game.autoPaused?'一時停止中':'3秒ごとに一手進みます。')+'</div>'+btn('toggle-auto',game.autoPaused?'再開':'一時停止',{},'primary');
     controlsEl.innerHTML=html;
     return;
@@ -1682,8 +1744,8 @@ function renderControls(){
   else if(game.state === 'tieChoice' && game.mode==='com' && game.attack.defenderKey==='B') html += automaticControls('COMが撤退させる攻撃キャラを選択中');
   else if(game.state === 'tieChoice') html += tieControls();
   else if(game.state === 'gameOver') html += game.isDraw
-    ? '<div class="controlsText">完全同点のため、このゲームは無効です。</div>' + btn('next-game','再試合へ',{},'primary')
-    : '<div class="controlsText">このゲームは終了しました。</div>' + btn('next-game','次のゲームへ',{},'primary');
+    ? '<div class="controlsText">完全同点のため、このゲームは無効です。</div>' + btn('next-game','再試合へ',{},'primary',!nextGameReady())
+    : '<div class="controlsText">このゲームは終了しました。</div>' + btn('next-game','次のゲームへ',{},'primary',!nextGameReady());
   else if(game.state === 'matchOver') html += '<div class="controlsText">マッチ終了です。「対戦をやり直す」で最初から始められます。</div>';
   if(game.mode!=='auto'&&!(game.mode==='com'&&((game.state==='standby'&&game.standbyKey==='B')||(['response','chain'].indexOf(game.state)>=0&&game.responseActorKey==='B')))){
     var selected=choice();
@@ -2169,7 +2231,7 @@ function setTrap(p,c,slotIndex){
   choice().standbyCard = null;
   choice().standbyTargetUid = null;
 }
-function activateExpansion(p,c,slot){
+function activateExpansion(p,c,slot,deferResolution){
   slot=Number(slot);
   if(openTacticSlotIndexes(p).indexOf(slot)<0)return;
   var played=takeCard(p.mainHand,c.cid);if(!played)return;
@@ -2177,6 +2239,7 @@ function activateExpansion(p,c,slot){
   window.dispatchEvent(new CustomEvent('duel:card-sound',{detail:{kind:'exp'}}));
   var state=choice();state.standbyCard=played.cid;state.expansionActivated=true;state.standbyTargetUid=null;state.summonDeckCid=null;state.discard.clear();
   log(p.name+'：展開カード「'+cardDisplayName(played)+'」を作戦エリア'+(slot+1)+'番枠で発動');
+  if(deferResolution)return;
   if(played.kind==='draw1'){resolveDrawOne(p,played);return;}
   if(played.kind==='draw2discard2'&&p.mainHand.length<2){log(p.name+'：手札が2枚未満のため「手札交換」を処理できない');consumeStandbyCard(p,played);return;}
   if(played.kind==='searchCharacter'&&!p.mainDeck.some(function(x){return x.type==='character';})){log(p.name+'：メインデッキにサーチできるキャラがない');consumeStandbyCard(p,played);return;}
@@ -2526,6 +2589,7 @@ function applyQueuedEffect(entry){
   if(kind==='peek2'){
     var seen=(payload.revealedLabels||[]).slice();
     if(!seen.length) seen=(payload.ids||[]).map(function(cid){var x=findCard(op.tacticHand,cid);return x?label(x):null;}).filter(Boolean);
+    if(game.mode==='auto'||entry.actorKey==='B')return op.name+'の戦術手札を'+seen.length+'枚確認';
     return op.name+'の戦術手札を確認'+(seen.length?'：'+seen.join(' ／ '):'（対象なし）');
   }
   if(kind==='drawTactic2'){
@@ -2637,8 +2701,7 @@ function resolveNextEffect(){
   entry.status='resolvedNow';
   atk.resolutionIndex--;
   if(atk.resolutionIndex<0){
-    clearFaceUpResponseCards();
-    finalizePendingZoneLocks();
+    // Activated cards remain in their zones through the battle result.
   }
   atk.resolutionMessage={title:(index+1)+'. '+entry.player+'「'+entry.card+'」を処理',detail:detail};
   log('【効果処理】'+(index+1)+'. '+entry.player+'：'+detail);
@@ -2704,25 +2767,6 @@ function moveToExclusion(p,ch){
   p.battleArea=p.battleArea.filter(function(x){return x.uid!==ch.uid;});
   delete ch.battleSlot;
   p.exclusion.push(ch);
-}
-function clearFaceUpResponseCards(){
-  [game.A,game.B].forEach(function(p){
-    if(p.tempPlayed.length){
-      p.tempPlayed.forEach(function(x){sendToRetreat(p,x);});
-      log(p.name+'：効果処理完了により表向きの戦術カードを'+p.tempPlayed.length+'枚撤退エリアへ');
-      p.tempPlayed=[];
-    }
-    var usedTrapCount=0;
-    p.trapZone=p.trapZone.filter(function(x){
-      if(game.attack.usedTraps.has(x.cid)){
-        sendToRetreat(p,x);
-        usedTrapCount++;
-        return false;
-      }
-      return true;
-    });
-    if(usedTrapCount) log(p.name+'：効果処理完了により表向きの罠カードを'+usedTrapCount+'枚撤退エリアへ');
-  });
 }
 function clearBattleCards(){
   [game.A,game.B].forEach(function(p){
@@ -2804,7 +2848,7 @@ function resolveAttack(){
     var zeroRemoved=removeZeroPowerAfterResult();
     atk.resolutionMessage={
       title:'攻撃結果　'+ap.name+'側 '+aSum+' ／ '+dp.name+'側 '+dSum,
-      detail:resultText+(zeroRemoved.length?'。さらにLv0のキャラを撤退':'')
+      detail:resultText+(zeroRemoved.length?'。攻撃結果の処理時に攻撃力0だったため、'+zeroRemoved.join('／')+'も撤退':'')
     };
     finishAttack();
   }
@@ -2928,8 +2972,8 @@ document.addEventListener('click',function(e){
   var b=e.target.closest('[data-action]');
   if(!b||(!b.closest('#controls,#decisionPanel,#deckActions,#selectionPanel,#ownHand')&&!b.closest('#autoPauseBtn'))||b.disabled||!game||setupTransitionPending)return;
   confirmHandsOff=b.dataset.handoff==='true';
-  recordHistory();
   var a=b.dataset.action,cid=Number(b.dataset.cid),uid=Number(b.dataset.uid),c=choice();
+  if(a!=='toggle-auto')recordHistory();
   window.dispatchEvent(new CustomEvent('duel:action',{detail:{action:a}}));
   if(a==='toggle-opening-tactic'){
     if(game.humanTacticSelection.has(cid))game.humanTacticSelection.delete(cid);
@@ -3000,7 +3044,7 @@ document.addEventListener('click',function(e){
   else if(a==='choose-tie-victim'){
     resolveTieVictim(uid);
   }
-  else if(a==='next-game'){var nextMode=game.mode;match.gameNo++;startGame(nextMode);}
+  else if(a==='next-game'){if(nextGameReady()){var nextMode=game.mode;match.gameNo++;startGame(nextMode);}}
   confirmHandsOff=false;
   render();
 });
@@ -3160,7 +3204,6 @@ battleStageEl.addEventListener('keydown',function(e){
   if(node&&(node._boardAction||node._responseSlot!=null)){e.preventDefault();node.click();}
   else if(node&&node._proxyControlButton&&!node._proxyControlButton.disabled){e.preventDefault();node._proxyControlButton.click();}
 });
-startBtn.addEventListener('click',function(){beginSelectedMode('manual');});
 comStartBtn.addEventListener('click',function(){beginSelectedMode('com');});
 autoStartBtn.addEventListener('click',function(){beginSelectedMode('auto');});
 
@@ -3174,10 +3217,10 @@ window.DuelEngine=Object.freeze({
     var p=side==='own'?game.A:game.B,cards=suffix==='Retreat'?p.retreat:p.exclusion;
     return {title:p.name+'の'+(suffix==='Retreat'?'撤退エリア':'除外エリア')+'（'+cards.length+'枚）',html:cards.map(function(c){return '<div class="card '+cardTypeClass(c)+'"'+cardInspectAttrs(c)+'>'+compactCardHtml(c)+'</div>';}).join('')||'<p>カードはありません</p>'};
   },
-  start:function(mode,firstKey){beginSelectedMode(mode==='com'||mode==='auto'?mode:'manual',firstKey,firstKey==='A'||firstKey==='B');},
+  start:function(mode,firstKey){beginSelectedMode(mode==='auto'?'auto':'com',firstKey,firstKey==='A'||firstKey==='B');},
   prepareInitialHand:function(){if(game&&game.state==='coinToss')runComStep();},
   setStartupPending:function(value){startupPending=!!value;if(startupPending)cancelComTimer();else queueComIfNeeded();},
-  view:function(){return game?{mode:game.mode,state:game.state,turn:game.turnKey,first:game.firstKey,turnCount:game.turnCount,actor:['response','chain'].indexOf(game.state)>=0?game.responseActorKey:['standby','mulliganConfirm'].indexOf(game.state)>=0?game.standbyKey:game.turnKey,scoreA:match.scoreA,scoreB:match.scoreB}:null;},
+  view:function(){return game?{mode:game.mode,state:game.state,autoPaused:!!game.autoPaused,battlePhaseAnnounced:!!game.battlePhaseAnnounced,turn:game.turnKey,first:game.firstKey,turnCount:game.turnCount,actor:['response','chain'].indexOf(game.state)>=0?game.responseActorKey:['standby','mulliganConfirm'].indexOf(game.state)>=0?game.standbyKey:game.turnKey,scoreA:match.scoreA,scoreB:match.scoreB}:null;},
   inspect:function(node){if(node&&node.dataset.inspectTitle)setInspector(node.dataset.inspectType,node.dataset.inspectTitle,node.dataset.inspectEffect);}
 });
 

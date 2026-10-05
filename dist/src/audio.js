@@ -1,4 +1,4 @@
-// Original four-channel 8-bit standby and battle themes, looped with Web Audio.
+// Streaming phase BGM loops; lightweight Web Audio sound effects.
 const AC=window.AudioContext||window.webkitAudioContext;
 const SETTING_KEY='duelArenaAudio';
 
@@ -24,16 +24,24 @@ export class DuelAudio{
  constructor(){
   let saved={};try{saved=JSON.parse(localStorage.getItem(SETTING_KEY)||'{}')||{};}catch(e){}
   this.musicEnabled=saved.music!==false;this.seEnabled=saved.se!==false;
-  this.musicVolume=Number.isFinite(saved.musicVolume)?Math.max(0,Math.min(100,saved.musicVolume)):22;
+  this.musicVolume=saved.bgmLevelVersion===2&&Number.isFinite(saved.musicVolume)?Math.max(0,Math.min(100,saved.musicVolume)):70;
+  if(saved.bgmLevelVersion!==2){try{localStorage.setItem(SETTING_KEY,JSON.stringify({...saved,musicVolume:this.musicVolume,bgmLevelVersion:2}));}catch(e){}}
   this.seVolume=Number.isFinite(saved.seVolume)?Math.max(0,Math.min(100,saved.seVolume)):38;
   this.musicPhase=null;
   this.musicTracks=Object.fromEntries(['standby','battle'].map(phase=>{
-   const extension=new Audio().canPlayType('audio/ogg; codecs="vorbis"')?'ogg':'mp3';
-   return [phase,{url:new URL(`../assets/audio/${phase}-8bit-v1.${extension}`,import.meta.url).href,buffer:null,loading:null,failed:false}];
+   return [phase,{url:new URL(`../assets/audio/${phase}-user-loop.m4a`,import.meta.url).href,streaming:true,buffer:null,loading:null,failed:false}];
   }));
-  this.music=new Audio();this.music.loop=true;this.music.preload='none';
+  this.musicPlayers=Object.fromEntries(Object.entries(this.musicTracks).map(([phase,track])=>{
+   const player=new Audio();player.loop=true;player.preload='auto';player.src=track.url;
+   return [phase,player];
+  }));
+  this.music=this.musicPlayers.standby;
+  this.effectSamples=Object.fromEntries(Object.entries({drawSet:'draw-set-user.m4a',handTurn:'hand-turn-user.m4a',cardEvent:'summon-activate-retreat-resolve-user.mp3',chain:'chain-user.mp3',choice:'select-pass-attack-confirm-user.mp3',levelUp:'level-up-user.m4a',levelDown:'level-down-user.m4a',win:'victory-user.wav',result:'battle-result-user.mp3'}).map(([kind,file])=>{
+   const url=new URL(`../assets/audio/${file}`,import.meta.url).href;
+   return [kind,Array.from({length:3},()=>{const player=new Audio(url);player.preload='auto';return player;})];
+  }));
   this.ctx=null;this.musicSource=null;this.musicSourceGain=null;this.musicSourcePhase=null;this.musicGain=null;
-  this.active=false;this.quietUntil=0;this.last={};
+  this.active=false;this.paused=false;this.victoryHold=false;this.victoryToken=0;this.quietUntil=0;this.last={};
   this.music.addEventListener('error',()=>{
    const track=this.musicTracks[this.musicPhase];
    if(track && track.url.endsWith('.ogg')){
@@ -54,7 +62,7 @@ export class DuelAudio{
    this.musicEnabled=musicToggle.checked;this.seEnabled=seToggle.checked;
    this.musicVolume=Number(bgmVolume.value);this.seVolume=Number(seVolume.value);
    this.setMusicVolume();this.resumeMusic();
-   try{localStorage.setItem(SETTING_KEY,JSON.stringify({music:this.musicEnabled,se:this.seEnabled,musicVolume:this.musicVolume,seVolume:this.seVolume}));}catch(e){}
+   try{localStorage.setItem(SETTING_KEY,JSON.stringify({music:this.musicEnabled,se:this.seEnabled,musicVolume:this.musicVolume,seVolume:this.seVolume,bgmLevelVersion:2}));}catch(e){}
   };
   for(const control of [musicToggle,seToggle,bgmVolume,seVolume])control.addEventListener('input',()=>{this.unlock();sync();});
  }
@@ -65,24 +73,36 @@ export class DuelAudio{
  }
  start(){this.unlock();this.active=true;this.syncPhase(window.DuelEngine?.view());this.resumeMusic();this.play('turn');}
  stop(){this.active=false;this.pauseMusic();}
+ resetForGame(view){
+  this.victoryToken++;this.victoryHold=false;
+  this.pauseMusic();
+  for(const player of this.effectSamples.win)player.pause();
+  this.quietUntil=0;this.last.win=0;
+  for(const player of Object.values(this.musicPlayers))player.currentTime=0;
+  this.musicPhase=null;
+  this.syncPhase(view);
+ }
  syncPhase(view){
   if(!view)return;
-  const phase=['coinToss','standby','mulliganConfirm','awaitTacticSelection'].includes(view.state)?'standby':'battle';
-  if(phase===this.musicPhase)return;
+  const wasPaused=this.paused;
+  this.paused=view.mode==='auto'&&!!view.autoPaused;
+  if(this.paused){this.pauseMusic();}
+  const phase=!view.battlePhaseAnnounced&&['coinToss','standby','mulliganConfirm','awaitTacticSelection'].includes(view.state)?'standby':'battle';
+  if(phase===this.musicPhase){if(wasPaused&&!this.paused)this.resumeMusic();return;}
   this.musicPhase=phase;
-  if(this.active)this.resumeMusic();
+  if(this.active&&!this.paused)this.resumeMusic();
  }
  pauseMusic(){
   if(this.musicSource){this.musicSource.stop();this.musicSource.disconnect();this.musicSource=null;this.musicSourceGain=null;this.musicSourcePhase=null;}
-  this.music.pause();
+  for(const player of Object.values(this.musicPlayers))player.pause();
  }
  setMusicVolume(){
-  const volume=this.musicEnabled?Math.min(.42,(this.musicVolume/100)*.72)*.5*(performance.now()<this.quietUntil ? .57 : 1):0;
-  this.music.volume=volume;if(this.musicGain)this.musicGain.gain.value=volume;
+  const volume=this.musicEnabled?(this.musicVolume/100)*(performance.now()<this.quietUntil ? .57 : 1):0;
+  for(const player of Object.values(this.musicPlayers))player.volume=volume;if(this.musicGain)this.musicGain.gain.value=volume;
  }
  loadMusic(phase){
   const track=this.musicTracks[phase];
-  if(!track||track.buffer||track.loading||track.failed||!this.ctx)return;
+  if(!track||track.streaming||track.buffer||track.loading||track.failed||!this.ctx)return;
   const decode=url=>fetch(url).then(response=>{
    if(!response.ok)throw Error('Music load failed');return response.arrayBuffer();
   }).then(data=>this.ctx.decodeAudioData(data));
@@ -95,14 +115,30 @@ export class DuelAudio{
  }
  resumeMusic(){
   this.setMusicVolume();
-  if(!this.active||!this.musicEnabled||document.hidden){this.pauseMusic();return;}
+  if(!this.active||this.paused||this.victoryHold||!this.musicEnabled||document.hidden){this.pauseMusic();return;}
   if(!this.musicPhase)return;
   const track=this.musicTracks[this.musicPhase];
+  if(track.streaming){
+   const phase=this.musicPhase,player=this.musicPlayers[phase];
+   this.music=player;
+   // The previous phase keeps playing while the preloaded track starts.
+   const finishSwitch=()=>{
+    if(this.musicPhase!==phase||!this.active||this.paused||!this.musicEnabled||document.hidden){
+     player.pause();
+     return;
+    }
+    for(const other of Object.values(this.musicPlayers))if(other!==player)other.pause();
+   };
+   if(player.paused)player.play().then(finishSwitch).catch(()=>{});
+   else finishSwitch();
+   return;
+  }
   if(!this.ctx){
    if(this.music.src!==track.url)this.music.src=track.url;
    if(this.music.paused)this.music.play().catch(()=>{});
    return;
   }
+  this.music.pause();
   if(!track.buffer){this.loadMusic(this.musicPhase);return;}
   if(this.musicSource&&this.musicSourcePhase===this.musicPhase)return;
   const at=this.ctx.currentTime;
@@ -148,34 +184,46 @@ export class DuelAudio{
   gain.gain.exponentialRampToValueAtTime(.0001,at+duration);
   source.connect(filter).connect(gain).connect(this.ctx.destination);source.start(at);source.stop(at+duration);
  }
+ playSample(kind,onEnd){
+  const players=this.effectSamples[kind];
+  if(!players)return;
+  const player=players.find(item=>item.paused||item.ended)||players[0];
+  player.pause();player.currentTime=0;
+  player.volume=this.seVolume/100;
+  if(onEnd){
+   let finished=false;
+   const done=()=>{if(finished)return;finished=true;player.removeEventListener('ended',done);onEnd();};
+   player.addEventListener('ended',done);
+   player.play().catch(done);
+  }else player.play().catch(()=>{});
+ }
  play(kind){
+  const now=performance.now();
+  if(kind==='win'){
+   if(this.last.win!=null&&now-this.last.win<1000)return;
+   this.last.win=now;this.victoryHold=true;this.pauseMusic();
+   window.dispatchEvent(new CustomEvent('duel:victory-se-start'));
+   const token=++this.victoryToken;
+   const done=()=>{if(token===this.victoryToken)window.dispatchEvent(new CustomEvent('duel:victory-se-end'));};
+   if(this.active&&this.seEnabled&&this.seVolume)this.playSample('win',done);
+   else done();
+   return;
+  }
   if(!this.active||!this.seEnabled||!this.seVolume)return;
+  if(['select','confirm'].includes(kind)&&now-(this.last[kind]||0)<110)return;
+  this.last[kind]=now;
+  if(kind==='draw'||kind==='set'){this.playSample('drawSet');return;}
+  if(kind==='hand'||kind==='turn'){this.playSample('handTurn');return;}
+  if(['summon','exp','trap','tactic','retreat','resolve'].includes(kind)){this.playSample('cardEvent');return;}
+  if(kind==='chain'){this.playSample('chain');return;}
+  if(['select','confirm','pass','attack'].includes(kind)){this.playSample('choice');return;}
+  if(kind==='levelUp'||kind==='levelDown'){this.playSample(kind);return;}
+  if(kind==='result'){this.playSample('result');return;}
   if(!this.ctx)this.unlock();
   if(!this.ctx)return;
   if(this.ctx.state==='suspended'){this.ctx.resume().then(()=>{if(this.ctx.state==='running')this.play(kind);}).catch(()=>{});return;}
   if(this.ctx.state!=='running')return;
-  const now=performance.now();if(['select','confirm'].includes(kind)&&now-(this.last[kind]||0)<110)return;this.last[kind]=now;
   switch(kind){
-   case 'select':this.noise(0,.025,.025);this.metal(920,0,.095,.085);break;
-   case 'confirm':this.metal(455,0,.15,.14);this.metal(820,.045,.12,.075);break;
-   case 'draw':this.noise(0,.075,.065);this.metal(610,.035,.15,.12);break;
-   case 'summon':this.noise(0,.20,.11);this.metal(118,.025,.34,.27);this.metal(355,.095,.24,.14);break;
-   case 'set':this.noise(0,.045,.045);this.metal(205,0,.16,.18);break;
-   case 'exp':this.metal(365,0,.19,.15);this.metal(735,.075,.22,.095);break;
-   case 'trap':this.noise(0,.09,.08);this.metal(225,0,.29,.24);this.metal(690,.045,.20,.12);break;
-   case 'tactic':this.metal(430,0,.18,.15);this.metal(880,.055,.21,.09);this.noise(.02,.055,.035);break;
-   case 'attack':this.noise(0,.18,.15);this.metal(102,.025,.32,.30);this.metal(302,.04,.22,.16);break;
-   case 'chain':this.metal(575,0,.14,.15);this.metal(755,.055,.15,.11);this.metal(945,.12,.19,.085);break;
-   case 'resolve':this.noise(0,.085,.05);this.metal(420,.01,.24,.14);this.metal(285,.09,.29,.11);break;
-   case 'levelUp':this.metal(520,0,.17,.13);this.metal(790,.075,.23,.14);break;
-   case 'levelDown':this.metal(690,0,.18,.13);this.metal(360,.075,.25,.14);break;
-   case 'retreat':this.noise(.035,.15,.07);this.metal(175,0,.34,.20);this.metal(248,.08,.25,.10);break;
-   case 'pass':this.metal(390,0,.16,.10);break;
-   case 'turn':this.metal(310,0,.23,.11);this.metal(465,.13,.29,.10);break;
-   case 'result':this.noise(0,.22,.15);this.metal(125,0,.39,.23);this.metal(248,.08,.30,.10);break;
-   case 'win':
-    this.quietUntil=performance.now()+1700;this.setMusicVolume();setTimeout(()=>this.setMusicVolume(),1700);
-    [196,294,392,587].forEach((freq,i)=>this.metal(freq,i*.16,.48,.18));break;
   }
  }
  onLog(message){const kind=classifyLog(message);if(kind)this.play(kind);}

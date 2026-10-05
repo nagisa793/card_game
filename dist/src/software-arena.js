@@ -1,8 +1,8 @@
 import {renderAttackArrows as drawAttackArrows} from './attack-arrows.js?v=54';
 import {renderBoardTargets,SLOT_WIDTH,SLOT_DEPTH} from './board-targets.js?v=2';
 import * as T from 'three';
-import {Arena} from './arena.js?v=54';
-import {palette,cardTexture} from './materials.js?v=32';
+import {Arena} from './arena.js?v=55';
+import {palette,cardTexture} from './materials.js?v=33';
 
 // The same 3D board geometry and camera, drawn by the browser's ordinary canvas
 // when it cannot provide a WebGL context. This is a renderer, not another game.
@@ -102,7 +102,10 @@ export class SoftwareArena {
   for(const slot of this.slots){const node=slot.userData.node;if(!node?.classList.contains('char'))continue;
    const p=this.project(slot.position.x,.51,slot.position.z),badge=document.createElement('span');
    badge.className='arenaLevelBadge'+(node.classList.contains('attackAttacker')||node.classList.contains('attackTarget')?' isSideways':'');
-   badge.textContent=(node.querySelector('.powerValue')?.textContent||'Lv. 1').replace(/^Lv\.?\s*/,'Lv. ');
+   const base=Number(node.dataset.basePower),mod=Number(node.dataset.tempMod);
+   if(base===0)badge.classList.add('baseZero');
+   const current=document.createElement('span');current.className='arenaCurrentPower';current.textContent=(node.querySelector('.powerValue')?.textContent||'Lv. 1').replace(/^Lv\.?\s*/,'Lv. ');badge.append(current);
+   if(node.dataset.tempActive==='true'){const detail=document.createElement('span');detail.className='arenaBasePower';detail.textContent='元Lv. '+base+' ／ 一時'+(mod>0?'+':mod===0?'±':'')+mod;badge.append(detail);}
    badge.style.left=p[0]+'px';badge.style.top=p[1]+'px';this.labels.append(badge);
   }
  }

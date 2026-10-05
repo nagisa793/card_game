@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>DUEL ARENA | カードバトル</title>
-<link rel="stylesheet" href="./src/legacy.css?v=39"><link rel="stylesheet" href="./src/interface.css?v=58">
+<link rel="stylesheet" href="./src/legacy.css?v=40"><link rel="stylesheet" href="./src/interface.css?v=76">
 </head>
 <body>
 
@@ -12,7 +12,6 @@
   <a class="brand" href="./index.html"><span>◇</span> DUEL ARENA</a><h1 id="simTitle" hidden></h1>
   <div>
     <button id="rulesBtn" type="button" aria-controls="rulesOverlay" aria-expanded="false">ルール説明</button>
-    <button id="startBtn">両者手動で開始</button>
     <button id="comStartBtn">対COMバージョン</button>
     <button id="autoStartBtn">COM同士を観戦</button>
     <button id="autoPauseBtn" class="autoPauseBtn" data-action="toggle-auto" type="button" hidden>⏸ 一時停止</button>
@@ -47,9 +46,8 @@
       <section class="rulesSection">
         <h3>1．対戦を始める</h3>
         <ul>
-          <li><b>両者手動</b>：AさんとBさんを一人で交互に操作します。全情報を表示します。</li>
           <li><b>対COM</b>：自分は下側の「あなた」を操作します。COMの手札と伏せ罠は見えず、COMは約3秒ごとに行動します。</li>
-          <li><b>COM同士</b>：両者が約3秒ごとに一手ずつ進めます。手札も表示され、マッチ終了まで自動で観戦できます。</li>
+          <li><b>COM同士</b>：両者が約3秒ごとに一手ずつ進めます。相手側の手札と伏せ罠は非公開で、マッチ終了まで自動で観戦できます。</li>
           <li>先攻と後攻は対戦開始時にランダムで決まります。</li>
         </ul>
       </section>
@@ -187,7 +185,7 @@
     <span id="gameStartLoading">盤面を準備中…</span>
   </div>
 </div>
-<div id="welcome"><div><button data-start-mode="com">対COMで遊ぶ</button><button data-start-mode="manual">両者手動</button><button data-start-mode="auto">COM同士を観戦</button></div></div>
+<div id="welcome"><div><button data-start-mode="com">対COMで遊ぶ</button><button data-start-mode="auto">COM同士を観戦</button></div></div>
   <div class="activeFlowRail" id="activeFlowRail" aria-label="現在のCHAINとRESOLVE">
     <div class="duelOverlay" id="duelOverlay" aria-live="polite"></div>
     <div class="resolutionBanner" id="resolutionBanner" aria-live="polite"></div>
@@ -255,7 +253,7 @@
 
 
 <script type="importmap">{"imports":{"three":"./vendor/three.module.js"}}</script>
-<script src="./src/engine.js?v=58"></script>
-<script type="module" src="./src/boot.js?v=58"></script>
+<script src="./src/engine.js?v=77"></script>
+<script type="module" src="./src/boot.js?v=77"></script>
 </body>
 </html>

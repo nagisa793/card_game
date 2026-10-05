@@ -1,7 +1,7 @@
-import {Arena} from './arena.js?v=54';
-import {SoftwareArena} from './software-arena.js?v=54';
-import {cardTexture,cardFaceReady} from './materials.js?v=32';
-import {DuelAudio} from './audio.js?v=33';
+import {Arena} from './arena.js?v=76';
+import {SoftwareArena} from './software-arena.js?v=76';
+import {cardTexture,cardFaceReady} from './materials.js?v=33';
+import {DuelAudio} from './audio.js?v=77';
 import {createDecisionUI} from './decision-ui.js?v=58';
 const $=id=>document.getElementById(id);
 function fitVisibleScreen(){
@@ -11,6 +11,7 @@ function fitVisibleScreen(){
 fitVisibleScreen();window.addEventListener('resize',fitVisibleScreen);
 window.visualViewport?.addEventListener('resize',fitVisibleScreen);
 const sound=new DuelAudio();
+window.addEventListener('duel:game-start',()=>sound.resetForGame(window.DuelEngine.view()));
 window.addEventListener('duel:render',()=>sound.syncPhase(window.DuelEngine.view()));
 window.addEventListener('duel:log',event=>sound.onLog(event.detail.text));
 window.addEventListener('duel:action',event=>sound.onAction(event.detail.action));
@@ -84,12 +85,12 @@ function refreshHandPointer(){
   node=document.elementFromPoint(lastPointer.clientX,lastPointer.clientY)?.closest?.('.handRow .card[data-cid]')||null;
   if(node?.dataset.hiddenCard==='true')node=null;
  }
- if(node!==hoveredHandNode){hoveredHandNode?.classList.remove('pointerHover');hoveredHandNode=node;hoveredHandNode?.classList.add('pointerHover');}
+ if(node!==hoveredHandNode){const previousCid=hoveredHandNode?.dataset.cid;hoveredHandNode?.classList.remove('pointerHover');hoveredHandNode=node;hoveredHandNode?.classList.add('pointerHover');if(node&&node.dataset.cid!==previousCid&&lastPointer?.pointerType==='mouse')sound.play('hand');}
  if(node)hoverCard(node);
  if(selectedHandCid!=null&&(!node||Number(node.dataset.cid)!==selectedHandCid)){selectedHandCid=null;raiseSelectedHand();}
 }
 document.addEventListener('pointermove',event=>{lastPointer={clientX:event.clientX,clientY:event.clientY,pointerType:event.pointerType,isDown:lastPointer?.isDown||false};refreshHandPointer();},{passive:true});
-document.addEventListener('pointerdown',event=>{document.body.classList.toggle('touchInput',event.pointerType!=='mouse');lastPointer={clientX:event.clientX,clientY:event.clientY,pointerType:event.pointerType,isDown:true};refreshHandPointer();},{passive:true});
+document.addEventListener('pointerdown',event=>{document.body.classList.toggle('touchInput',event.pointerType!=='mouse');lastPointer={clientX:event.clientX,clientY:event.clientY,pointerType:event.pointerType,isDown:true};if(event.pointerType!=='mouse'&&event.target.closest?.('.handRow .card[data-cid]:not([data-hidden-card="true"])'))sound.play('hand');refreshHandPointer();},{passive:true});
 document.addEventListener('pointerup',event=>{if(lastPointer){lastPointer={clientX:event.clientX,clientY:event.clientY,pointerType:event.pointerType,isDown:false};refreshHandPointer();}},{passive:true});
 window.addEventListener('blur',()=>{lastPointer=null;hoveredHandNode?.classList.remove('pointerHover');hoveredHandNode=null;selectedHandCid=null;raiseSelectedHand();hoverCard(null);});
 document.addEventListener('click',event=>{
@@ -131,7 +132,8 @@ function syncLevelSounds(){
   next.set(id,level);
  }
  previousLevels=next;
- if(raised)sound.play('levelUp');else if(lowered)sound.play('levelDown');
+ if(raised)sound.play('levelUp');
+ if(lowered)sound.play('levelDown');
 }
 function updateInspector(){
  if(!arena)return;const type=inspector.querySelector('.inspectorCard').className.match(/inspect-(\w+)/)?.[1]||'back';const title=$('inspectorName').textContent;
@@ -165,7 +167,7 @@ function update(){
  const preview=$('ownSelectedTacticPreview'),previewBtn=$('tacticPreviewBtn');previewBtn.hidden=preview.hidden;
  if(preview.hidden){preview.classList.remove('open');previewBtn.setAttribute('aria-expanded','false');}
  $('battleStage').dataset.mode=view?.mode||'welcome';
- for(const mode of ['com','manual','auto']){const b=mode==='com'?$('comStartBtn'):mode==='auto'?$('autoStartBtn'):$('startBtn');b.classList.toggle('activeMode',view?.mode===mode);}
+ for(const mode of ['com','auto']){const b=mode==='com'?$('comStartBtn'):$('autoStartBtn');b.classList.toggle('activeMode',view?.mode===mode);}
  $('scoreText').textContent=view?`${view.scoreA} — ${view.scoreB}`:'—';
  for(const item of document.querySelectorAll('#chainPanel .activeChainItem')){
   item.style.setProperty('--chain-art',`url("${artwork(item.dataset.artType||'tactic',item.dataset.artTitle||'',item.dataset.artEffect||'')}")`);
@@ -183,6 +185,7 @@ for(const id of ['ownHand','oppHand','ownSelectedTacticHand'])new MutationObserv
 for(const id of ['ownBattle','oppBattle'])new MutationObserver(()=>{arena?.rebindHoverAfterDomUpdate();schedule();}).observe($(id),{subtree:true,childList:true,attributes:true,attributeFilter:['class']});
 const startOverlay=$('gameStartOverlay'),startTitle=$('gameStartTitle'),startOrder=$('gameStartOrder'),startLoading=$('gameStartLoading');
 function showBattlePhase(){
+ sound.syncPhase({...window.DuelEngine.view(),battlePhaseAnnounced:true});
  const token=++battlePhaseSequence;startTitle.textContent='BATTLE PHASE';startTitle.hidden=false;startOrder.hidden=true;startLoading.hidden=true;
  startOverlay.hidden=false;startOverlay.classList.remove('boardReveal');startOverlay.classList.add('phaseReveal','battlePhaseReveal');
  setTimeout(()=>{if(token!==battlePhaseSequence)return;startOverlay.hidden=true;startOverlay.classList.remove('phaseReveal','battlePhaseReveal');},PHASE_DISPLAY_MS);
@@ -230,7 +233,7 @@ async function startWithIntro(mode){
  if(current&&current.state!=='matchOver'&&!window.confirm('進行中の対戦を破棄して最初からやり直しますか？'))return;
  startingGame=true;
  const firstKey=Math.random()<0.5?'A':'B';
- const playerName=key=>mode==='com'?(key==='A'?'あなた':'COM'):mode==='auto'?`COM ${key}`:`${key}さん`;
+ const playerName=key=>mode==='com'?(key==='A'?'あなた':'COM'):`COM ${key}`;
  pinnedCard=null;hoveredCard=null;showCardPreview();
  startOverlay.hidden=false;startOverlay.classList.remove('boardReveal','phaseReveal');document.body.classList.add('gameStarting');
  startTitle.textContent='GAME START';startTitle.hidden=false;
@@ -261,11 +264,11 @@ async function startWithIntro(mode){
   warn('盤面の準備に失敗しました。ページを再読み込みしてください。');
  }
 }
-for(const b of [...document.querySelectorAll('[data-start-mode]'),$('startBtn'),$('comStartBtn'),$('autoStartBtn')]){
+for(const b of [...document.querySelectorAll('[data-start-mode]'),$('comStartBtn'),$('autoStartBtn')]){
  b.addEventListener('pointerdown',()=>sound.unlock(),{capture:true});
  b.addEventListener('click',event=>{
   event.preventDefault();event.stopImmediatePropagation();
-  const mode=b.dataset.startMode||(b.id==='comStartBtn'?'com':b.id==='autoStartBtn'?'auto':'manual');
+  const mode=b.dataset.startMode||(b.id==='autoStartBtn'?'auto':'com');
   startWithIntro(mode);
  },{capture:true});
 }
