@@ -9,6 +9,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 jobs:
   import:
@@ -171,3 +172,8 @@ jobs:
           fi
           git commit -m "Import DUEL ARENA v77 runtime from published Site"
           git push
+
+      - name: Publish updated game to GitHub Pages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run deploy-pages.yml --ref main
