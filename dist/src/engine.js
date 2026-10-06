@@ -73,16 +73,16 @@ var TRAP_LABEL = {
   lockZone:'罠：相手の空き枠か表向きカードの枠を指定し、攻防連鎖の全効果処理後に封鎖',
   reviveFromRetreat:'罠：自分の撤退エリアからキャラ1体をLv1で召喚',
   removePower1:'罠：相手の場のキャラ1体を選び、効果処理時に攻撃力1なら除外',
-  skipAttack:'罠：相手の次の攻撃宣言を1回スキップ',
+  skipAttack:'罠：自分のキャラが相手より少ないとき、次の相手の攻撃宣言をスキップ',
   forceEnd:'罠：攻防を強制終了',
   splitAttack:'罠：3体以上の攻撃から1体をその攻防だけ外す'
 };
 var TRAP_NAME = {
   levelDown:'衰弱の刻印',
   lockZone:'作戦封鎖',
-  reviveFromRetreat:'帰還の狼煙',
+  reviveFromRetreat:'復活の狼煙',
   removePower1:'弱兵排除',
-  skipAttack:'進軍阻止',
+  skipAttack:'判官贔屓',
   forceEnd:'強制終結',
   splitAttack:'分断工作'
 };
@@ -118,27 +118,29 @@ var TACTIC_NAME = {
 };
 var EXP_LABEL = {
   growth:'展開：バトルエリアのキャラの攻撃力を永続+1',
+  rapidGrowth:'展開：自分のバトルエリアのキャラ1体の攻撃力を永続+2',
   summon:'展開：メインデッキからキャラを1体召喚',
-  summonShuffleDraw:'展開：キャラを召喚しシャッフルして1枚ドロー',
+  summonShuffleDraw:'展開：デッキから異なるキャラ3体を見せ、裏向きにして相手が選んだ1体を召喚。3体揃わなければ無効',
   draw2discard2:'手札から2枚をメインデッキに戻してシャッフルし、2枚ドロー',
   draw1:'展開：メインデッキから1枚ドロー',
-  searchCharacter:'展開：メインデッキからキャラ1枚を手札に加える',
   defensePrep:'展開：デッキ上3枚から罠1枚を作戦エリアに伏せる'
 };
 var EXP_NAME = {
-  growth:'鍛錬',
+  growth:'成長',
+  rapidGrowth:'急成長',
   summon:'緊急招集',
   summonShuffleDraw:'増援到着',
   draw2discard2:'手札交換',
   draw1:'補給',
-  searchCharacter:'仲間捜索',
   defensePrep:'防衛準備'
 };
 var LIMITED_KINDS = {
-  lockZone:true, reviveFromRetreat:true, removePower1:true, skipAttack:true, forceEnd:true, splitAttack:true,
+  lockZone:true, reviveFromRetreat:true, removePower1:true, skipAttack:true, forceEnd:true, rapidGrowth:true,
   peek2:true, drawTactic2:true, redirect:true, revive:true, buffAll1:true, debuffAll1:true, recycle:true,
   negateTrap:true, strategyShift:true, supportDefense:true, lastStand:true
 };
+var SEMI_LIMITED_KINDS={summon:true,draw1:true,defensePrep:true,levelDown:true};
+function cardLimitLabel(c){return LIMITED_KINDS[c.kind]?'【制限】':SEMI_LIMITED_KINDS[c.kind]?'【準制限】':'';}
 
 function shuffle(arr){
   var a = arr.slice();
@@ -156,10 +158,10 @@ function card(type, data){
 function buildMainDeck(characterNames){
   var deck = [];
   characterNames.forEach(function(name){ for(var i=0;i<3;i++) deck.push(card('character',{name:name})); });
-  [['growth',3],['summon',3],['draw2discard2',3],['summonShuffleDraw',3],['draw1',2],['searchCharacter',2],['defensePrep',1]].forEach(function(x){
+  [['growth',3],['summon',2],['draw2discard2',3],['summonShuffleDraw',3],['draw1',2],['rapidGrowth',1],['defensePrep',2]].forEach(function(x){
     for(var i=0;i<x[1];i++) deck.push(card('exp',{kind:x[0]}));
   });
-  [['levelDown',2],['lockZone',1],['reviveFromRetreat',1],['removePower1',1],['skipAttack',1],['forceEnd',1],['splitAttack',1]].forEach(function(x){
+  [['levelDown',2],['lockZone',1],['reviveFromRetreat',1],['removePower1',1],['skipAttack',1],['forceEnd',1],['splitAttack',2]].forEach(function(x){
     for(var i=0;i<x[1];i++) deck.push(card('trap',{kind:x[0],chain:x[0]==='forceEnd'}));
   });
   return shuffle(deck);
@@ -185,8 +187,8 @@ function newPlayer(name, first, characterNames){
 }
 function label(c){
   if(c.type === 'character') return 'キャラ：' + c.name + '（Lv' + (c.level==null ? 1 : c.level) + '）';
-  if(c.type === 'exp') return '展開「' + (EXP_NAME[c.kind] || '名称未定') + '」：' + (EXP_LABEL[c.kind] || '展開：？').replace(/^展開：/,'');
-  if(c.type === 'trap') return '罠「' + (TRAP_NAME[c.kind] || '名称未定') + '」：' + (TRAP_LABEL[c.kind] || '罠：？').replace(/^罠：/,'') + (LIMITED_KINDS[c.kind] ? '【制限】' : '') + (c.chain ? '【連続発動】' : '');
+  if(c.type === 'exp') return '展開「' + (EXP_NAME[c.kind] || '名称未定') + '」：' + (EXP_LABEL[c.kind] || '展開：？').replace(/^展開：/,'')+cardLimitLabel(c);
+  if(c.type === 'trap') return '罠「' + (TRAP_NAME[c.kind] || '名称未定') + '」：' + (TRAP_LABEL[c.kind] || '罠：？').replace(/^罠：/,'') + cardLimitLabel(c) + (c.chain ? '【連続発動】' : '');
   if(c.type === 'tactic' && c.kind === 'namedShift') return '戦術「' + c.targetName + '専用戦術」：自分の' + c.targetName + '+2／相手の' + c.targetName + '-2';
   if(c.type === 'tactic') return '戦術「' + (TACTIC_NAME[c.kind] || '名称未定') + '」：' + (TACTIC_LABEL[c.kind] || '戦術：？').replace(/^戦術：/,'') + (LIMITED_KINDS[c.kind] ? '【制限】' : '') + (c.chain ? '【連続発動】' : '');
   return '？';
@@ -210,8 +212,8 @@ function cardEffectText(c,powerOverride){
     var lv=powerOverride==null?(c.level==null?1:c.level):powerOverride;
     return '現在の攻撃力：'+lv+(powerOverride!=null && c.level!=null && powerOverride!==c.level?' ／ 元の攻撃力：'+c.level:'');
   }
-  if(c.type==='exp') return (EXP_LABEL[c.kind]||'展開：？').replace(/^展開：/,'');
-  if(c.type==='trap') return (TRAP_LABEL[c.kind]||'罠：？').replace(/^罠：/,'')+(LIMITED_KINDS[c.kind]?'　【制限カード】':'')+(c.chain?'　【連続発動】':'');
+  if(c.type==='exp') return (EXP_LABEL[c.kind]||'展開：？').replace(/^展開：/,'')+(cardLimitLabel(c)?'　'+cardLimitLabel(c):'');
+  if(c.type==='trap') return (TRAP_LABEL[c.kind]||'罠：？').replace(/^罠：/,'')+(cardLimitLabel(c)?'　'+cardLimitLabel(c):'')+(c.chain?'　【連続発動】':'');
   if(c.type==='tactic' && c.kind==='namedShift') return '自分の'+c.targetName+'を+2／相手の'+c.targetName+'を-2';
   if(c.type==='tactic') return (TACTIC_LABEL[c.kind]||'戦術：？').replace(/^戦術：/,'')+(LIMITED_KINDS[c.kind]?'　【制限カード】':'')+(c.chain?'　【連続発動】':'');
   return '';
@@ -335,7 +337,7 @@ function compactChoiceLabel(c,includeType){
   var name=c.type==='character'
     ? (c.name||'名称不明')+' Lv'+(c.level==null?1:c.level)
     : (c.type==='tactic'&&c.kind==='namedShift' ? (c.targetName||'キャラ')+'専用' : cardDisplayName(c));
-  var flags=(LIMITED_KINDS[c.kind]?'【制限】':'')+(c.chain?'【連続】':'');
+  var flags=cardLimitLabel(c)+(c.chain?'【連続】':'');
   return prefix+name+flags;
 }
 function cardTypeClass(c){
@@ -787,14 +789,28 @@ function chainPanelHtml(){
 function selectionPanelHtml(){
   if(!game)return null;
   var title='',cards=[],action='',chosen=null,disabled=false,empty='';
-  if(openingTacticSelectionActive()){
+  var reinforcementChoice=game.state==='standby'&&choice().reinforcement&&game.standbyKey==='B'&&['reveal','choose'].indexOf(choice().reinforcement.stage)>=0;
+  if(openingTacticSelectionActive()&&!reinforcementChoice){
     var picked=game.humanTacticSelection;title='戦術デッキ｜手札を7枚選択（'+picked.size+' / 7）';
     cards=tacticsInDisplayOrder(game.A.tacticDeck.filter(function(c){return !picked.has(c.cid);}));action='toggle-opening-tactic';disabled=picked.size>=7;
   }else if(game.state==='standby'){
     var p=playerByKey(game.standbyKey),c=choice(),active=c.expansionActivated?findCard(p.tempPlayed,c.standbyCard):null;
-    if(active&&active.kind==='searchCharacter'){
-      title='メインデッキ｜手札に加えるキャラ';cards=p.mainDeck.filter(function(x){return x.type==='character';});action='search-character';
-    }else if(active&&(active.kind==='summon'||active.kind==='summonShuffleDraw')){
+    if(active&&active.kind==='summonShuffleDraw'){
+      var offer=c.reinforcement;
+      if(offer&&offer.stage==='pick'){
+        if(p===game.B)return null;
+        title='増援到着｜異なるキャラを3体選択（'+offer.ids.length+'/3）';
+        var names=new Set();cards=p.mainDeck.filter(function(x){if(x.type!=='character'||names.has(x.name))return false;names.add(x.name);return true;});
+        action='pick-reinforcement';
+      }else if(offer&&offer.stage==='reveal'){
+        title='増援到着｜相手に見せる3体';cards=offer.ids.map(function(id){return findCard(p.mainDeck,id);}).filter(Boolean);action='show-reinforcement';
+      }else if(offer&&offer.stage==='choose'){
+        title='増援到着｜裏向きの3枚から相手が1枚選択';
+        var backs='<div class="handRow selectionCardGrid">';
+        offer.ids.forEach(function(id,i){backs+='<button type="button" class="cardBack selectionCard reinforcementBack" data-action="choose-reinforcement" data-index="'+i+'" aria-label="裏向きのカード'+(i+1)+'を選ぶ">非公開</button>';});
+        return {title:title,html:backs+'</div>'};
+      }
+    }else if(active&&active.kind==='summon'){
       title='メインデッキ｜召喚するキャラ';cards=p.mainDeck.filter(function(x){return x.type==='character';});action='choose-special-character';chosen=c.summonDeckCid;
     }else if(active&&active.kind==='defensePrep'){
       title='メインデッキ｜上から3枚を確認';cards=p.mainDeck.slice(0,3);action='resolve-defense-prep';disabled=tacticSlotsOpen(p)<=0;
@@ -816,7 +832,7 @@ function selectionPanelHtml(){
   cards=cards.slice().sort(function(a,b){return cardDisplayName(a).localeCompare(cardDisplayName(b),'ja')||Number(!!a.chain)-Number(!!b.chain)||a.cid-b.cid;});
   var html='<div class="handRow selectionCardGrid">';
   cards.forEach(function(c){
-    var isSelected=action==='toggle-effect-card'?choice().effect.has(c.cid):chosen!=null&&Number(chosen)===Number(action==='choose-revive-target'?c.uid:c.cid),isDisabled=disabled&&(action==='toggle-opening-tactic'||action==='resolve-defense-prep')||action==='resolve-defense-prep'&&c.type!=='trap';
+    var isSelected=action==='pick-reinforcement'?choice().reinforcement.ids.indexOf(c.cid)>=0:action==='toggle-effect-card'?choice().effect.has(c.cid):chosen!=null&&Number(chosen)===Number(action==='choose-revive-target'?c.uid:c.cid),isDisabled=disabled&&(action==='toggle-opening-tactic'||action==='resolve-defense-prep')||action==='resolve-defense-prep'&&c.type!=='trap';
     html+='<button type="button" class="card own '+cardTypeClass(c)+' selectionCard'+(isSelected?' selected':'')+'" data-action="'+action+'"'+(action==='choose-revive-target'?' data-uid="'+Number(c.uid)+'"':'')+cardInspectAttrs(c)+' aria-pressed="'+(isSelected?'true':'false')+'"'+(isDisabled?' disabled':'')+'>'+compactCardHtml(c)+'</button>';
   });
   html+='</div>'+(empty?'<div class="selectionPanelEmpty">'+esc(empty)+'</div>':'');
@@ -960,8 +976,8 @@ function decorateLegalTargets(){
       openTacticSlotIndexes(p).forEach(function(index){bindBoard(document.getElementById(tacticId)?.children[index],{kind:'setTrap',slot:index},'ここに罠を伏せる');});
     }else if(card&&card.type==='exp'){
       openTacticSlotIndexes(p).forEach(function(index){bindBoard(document.getElementById(tacticId)?.children[index],{kind:'activateExpansion',slot:index},'ここで展開カードを発動');});
-    }else if(pending&&pending.kind==='growth'){
-      p.battleArea.filter(function(x){return x.level<3;}).forEach(function(ch){var node=document.querySelector('#'+battleId+' .slot[data-uid="'+Number(ch.uid)+'"]');bindBoard(node,{kind:'growthTarget',uid:ch.uid},'このキャラを強化');});
+    }else if(pending&&(pending.kind==='growth'||pending.kind==='rapidGrowth')){
+      p.battleArea.filter(function(x){return pending.kind==='rapidGrowth'||x.level<3;}).forEach(function(ch){var node=document.querySelector('#'+battleId+' .slot[data-uid="'+Number(ch.uid)+'"]');bindBoard(node,{kind:'growthTarget',uid:ch.uid},'このキャラを強化');});
     }else if(pending&&(pending.kind==='summon'||pending.kind==='summonShuffleDraw')&&c.summonDeckCid!=null&&findCard(p.mainDeck,c.summonDeckCid)){
       openBattleSlotIndexes(p,false).forEach(function(index){bindBoard(document.getElementById(battleId)?.children[index],{kind:'specialSummon',slot:index,cid:c.summonDeckCid},'ここに特殊召喚');});
     }
@@ -1367,7 +1383,10 @@ function comActionPending(){
   if(game.state==='gameOver'&&!nextGameReady())return false;
   if(game.mode==='auto') return ['coinToss','standby','mulliganConfirm','turnDraw','attackDeclare','response','chain','resolving','penalty','tieChoice','gameOver'].indexOf(game.state)!==-1;
   if(game.state==='coinToss') return true;
-  if(game.state==='standby') return game.standbyKey==='B';
+  if(game.state==='standby'){
+    var offer=choice().reinforcement;
+    return offer ? (offer.stage==='reveal' ? game.standbyKey==='A' : offer.stage==='choose' ? game.standbyKey==='A' : game.standbyKey==='B') : game.standbyKey==='B';
+  }
   if(game.state==='mulliganConfirm') return other(playerByKey(game.standbyKey))===game.B;
   if(game.state==='turnDraw') return game.turnKey==='B';
   if(game.state==='attackDeclare') return game.turnKey==='B';
@@ -1429,16 +1448,30 @@ function comStandbyStep(){
   if(choice().expansionActivated){
     var active=findCard(p.tempPlayed,choice().standbyCard),target,deckChar,topTrap,others;
     if(!active){clearChoice();return;}
-    if(active.kind==='summon'||active.kind==='summonShuffleDraw'){
+    if(active.kind==='summonShuffleDraw'){
+      var offer=choice().reinforcement;
+      if(!offer){beginReinforcement(p,active);return;}
+      if(offer.stage==='pick'){
+        var names=new Set();offer.ids=[];
+        shuffle(p.mainDeck.filter(function(x){if(x.type!=='character'||names.has(x.name))return false;names.add(x.name);return true;})).slice(0,3).forEach(function(x){offer.ids.push(x.cid);});
+        revealReinforcement(p);return;
+      }
+      if(offer.stage==='reveal'){offer.stage='choose';return;}
+      if(offer.stage==='choose'){
+        chooseReinforcement(Math.floor(Math.random()*offer.ids.length));return;
+      }
+      if(offer.stage==='slot'){
+        var open=openBattleSlotIndexes(p,false);
+        if(open.length)specialSummon(p,active,choice().summonDeckCid,open[0]);else consumeStandbyCard(p,active);
+        return;
+      }
+    }else if(active.kind==='summon'){
       deckChar=p.mainDeck.find(function(x){return x.type==='character';});
       var battleSlot=openBattleSlotIndexes(p,false)[0];
       if(deckChar&&battleSlot!=null)specialSummon(p,active,deckChar.cid,battleSlot);
       else finishExpansionAfterSummon(p,active);
-    }else if(active.kind==='searchCharacter'){
-      deckChar=p.mainDeck.find(function(x){return x.type==='character';});
-      if(deckChar)searchCharacterToHand(p,active,deckChar.cid);else consumeStandbyCard(p,active);
-    }else if(active.kind==='growth'){
-      target=p.battleArea.filter(function(ch){return ch.level<3;}).sort(function(a,b){return a.level-b.level;})[0];
+    }else if(active.kind==='growth'||active.kind==='rapidGrowth'){
+      target=p.battleArea.filter(function(ch){return active.kind==='rapidGrowth'||ch.level<3;}).sort(function(a,b){return a.level-b.level;})[0];
       if(target)useExpansionTarget(p,active,target.uid);else consumeStandbyCard(p,active);
     }else if(active.kind==='defensePrep'){
       topTrap=p.mainDeck.slice(0,3).find(function(x){return x.type==='trap';});
@@ -1455,11 +1488,11 @@ function comStandbyStep(){
   var ordered=cardsInTypeOrder(p.mainHand),c;
   c=ordered.find(function(x){return x.type==='character' && p.battleArea.length<5;});
   if(c){prepareComStandbyChoice(c);summonCharacter(p,c,openBattleSlotIndexes(p,false)[0]);return;}
-  c=ordered.find(function(x){return x.type==='exp' && (x.kind==='summon'||x.kind==='summonShuffleDraw') && p.battleArea.length<5 && p.mainDeck.some(function(d){return d.type==='character';}) && tacticSlotsOpen(p)>0;});
+  c=ordered.find(function(x){return x.type==='exp' && x.kind==='summon' && p.battleArea.length<5 && p.mainDeck.some(function(d){return d.type==='character';}) && tacticSlotsOpen(p)>0;});
   if(c){prepareComStandbyChoice(c);activateExpansion(p,c,firstOpenTacticSlot(p),true);return;}
-  c=ordered.find(function(x){return x.type==='exp' && x.kind==='searchCharacter' && p.mainDeck.some(function(d){return d.type==='character';}) && tacticSlotsOpen(p)>0;});
+  c=ordered.find(function(x){return x.type==='exp' && x.kind==='summonShuffleDraw' && p.battleArea.length<5 && new Set(p.mainDeck.filter(function(d){return d.type==='character';}).map(function(d){return d.name;})).size>=3 && tacticSlotsOpen(p)>0;});
   if(c){prepareComStandbyChoice(c);activateExpansion(p,c,firstOpenTacticSlot(p),true);return;}
-  c=ordered.find(function(x){return x.type==='exp' && x.kind==='growth' && p.battleArea.some(function(ch){return ch.level<3;}) && tacticSlotsOpen(p)>0;});
+  c=ordered.find(function(x){return x.type==='exp' && (x.kind==='growth'||x.kind==='rapidGrowth') && p.battleArea.some(function(ch){return x.kind==='rapidGrowth'||ch.level<3;}) && tacticSlotsOpen(p)>0;});
   if(c){prepareComStandbyChoice(c);activateExpansion(p,c,firstOpenTacticSlot(p),true);return;}
   c=ordered.find(function(x){return x.type==='trap' && tacticSlotsOpen(p)>0;});
   if(c){prepareComStandbyChoice(c);setTrap(p,c);return;}
@@ -1474,8 +1507,8 @@ function comStandbyStep(){
 function comDiscardPriority(c,p){
   if(c.type==='character') return p.battleArea.length>=5?100:15;
   if(c.type==='trap') return tacticSlotsOpen(p)<=0?90:25;
-  if(c.kind==='growth') return p.battleArea.some(function(x){return x.level<3;})?20:85;
-  if(c.kind==='summon'||c.kind==='summonShuffleDraw'||c.kind==='searchCharacter') return p.battleArea.length>=5?80:20;
+  if(c.kind==='growth'||c.kind==='rapidGrowth') return p.battleArea.some(function(x){return c.kind==='rapidGrowth'||x.level<3;})?20:85;
+  if(c.kind==='summon'||c.kind==='summonShuffleDraw') return p.battleArea.length>=5?80:20;
   return 35;
 }
 function comDeclareAttack(){
@@ -1627,7 +1660,7 @@ function comResponsePlan(info){
     if(!lockTargets.length)return null;
     payload.lockSlot=lockTargets[0];score=needsPower?15:65;
   }else if(kind==='skipAttack'){
-    if(op.skipNextAttack||!op.battleArea.length)return null;
+    if(op.skipNextAttack||!op.battleArea.length||actor.battleArea.length>=op.battleArea.length)return null;
     score=needsPower?12:62;
   }else{
     score=45;
@@ -1726,6 +1759,7 @@ function renderControls(){
   }
   if(game.state === 'coinToss') html += coinTossControls();
   else if(game.state === 'awaitTacticSelection') html += openingTacticSelectionControls();
+  else if(game.state === 'standby' && choice().reinforcement && game.mode==='com' && game.standbyKey==='B' && ['reveal','choose'].indexOf(choice().reinforcement.stage)>=0) html += reinforcementControls();
   else if(game.state === 'standby' && game.mode==='com' && game.standbyKey==='B') html += comStandbyControls();
   else if(game.state === 'standby') html += standbyControls();
   else if(game.state === 'mulliganConfirm') html += mulliganControls();
@@ -1800,6 +1834,7 @@ function standbyControls(){
   var c = choice();
   var html = '<div class="controlsText"><b>' + p.name + '</b>を操作中　メイン手札：' + p.mainHand.length + '枚</div>';
   var pendingExpansion=c.expansionActivated?findCard(p.tempPlayed,c.standbyCard):null;
+  if(pendingExpansion&&pendingExpansion.kind==='summonShuffleDraw'&&c.reinforcement&&c.reinforcement.stage!=='slot')return html+reinforcementControls();
   if(!p.mainHand.length&&!pendingExpansion)return html+'<div class="activeDecision standbyFinishPrompt"><div class="controlsText"><b>スタンバイフェイズを終了しますか？</b></div>'+btn('finish-standby','スタンバイフェイズを終了',{},'primary')+'</div>';
   var selected = pendingExpansion||findCard(p.mainHand,c.standbyCard);
   if(selected){
@@ -1811,18 +1846,17 @@ function standbyControls(){
     }else if(selected.type === 'trap'){
       details='<div class="controlsText">作戦エリアの光っている空き枠をタップして伏せます。</div>';
       if(tacticSlotsOpen(p)<=0)details='<div class="controlsText">作戦エリアに空き枠がありません。</div>';
-    }else if(selected.kind === 'growth'&&!pendingExpansion){
+    }else if((selected.kind === 'growth'||selected.kind==='rapidGrowth')&&!pendingExpansion){
       details='<div class="controlsText">作戦エリアの空き枠をタップして発動します。</div>';
-    }else if(selected.kind === 'growth'){
-      var targets=p.battleArea.filter(function(x){return x.level<3;});
+    }else if(selected.kind === 'growth'||selected.kind==='rapidGrowth'){
+      var targets=p.battleArea.filter(function(x){return selected.kind==='rapidGrowth'||x.level<3;});
       details='作戦エリアで発動しました。強化するキャラを盤面でタップしてください。';
       if(!targets.length)details='強化できるキャラがいません。';
     }else if(selected.kind === 'summon' || selected.kind === 'summonShuffleDraw'){
       if(!pendingExpansion)details='<div class="controlsText">作戦エリアの空き枠をタップして発動します。</div>';
+      else if(selected.kind==='summonShuffleDraw'&&c.reinforcement&&c.reinforcement.stage==='slot')details='相手が選んだ「'+esc(findCard(p.mainDeck,c.summonDeckCid)?.name||'キャラ')+'」を、光っている空き枠に召喚してください。';
       else if(c.summonDeckCid==null)details='左側のカード一覧から召喚するキャラを選んでください。';
       else details='作戦エリアで発動中です。バトルエリアの光っている空き枠をタップしてください。';
-    }else if(selected.kind === 'searchCharacter'){
-      details=pendingExpansion?'左側のカード一覧から手札に加えるキャラをタップしてください。':'作戦エリアの空き枠をタップして発動します。';
     }else if(selected.kind === 'draw2discard2'){
       if(!pendingExpansion)details='<div class="controlsText">作戦エリアの空き枠をタップして発動します。</div>';
       else{
@@ -1844,6 +1878,14 @@ function standbyControls(){
   if(p.mainHand.length&&!pendingExpansion){html+='<div class="controlsText controlsListLabel">処理するカードを選んでください。</div><div class="buttonGroup compactChoiceGrid standbyCardGrid">';
     cardsInTypeOrder(p.mainHand).forEach(function(x){html+=btn('choose-standby',compactChoiceLabel(x,true),{cid:x.cid},cardButtonClass(x,c.standbyCard===x.cid));});html+='</div>';}
   return html;
+}
+function reinforcementControls(){
+  var p=playerByKey(game.standbyKey),offer=choice().reinforcement;
+  if(!offer)return '';
+  if(offer.stage==='pick')return '<div class="controlsText">デッキから異なるキャラを3体選んでください。</div>'+btn('confirm-reinforcement','3体を相手に見せる',{},'primary',offer.ids.length!==3);
+  if(offer.stage==='reveal')return '<div class="controlsText">'+esc(p.name)+'が選んだ3体を公開しています。確認後、裏向きにして相手が選びます。</div>'+(game.mode==='com'&&game.standbyKey==='B'?btn('hide-reinforcement','裏向きにして選ぶ',{},'primary'):'');
+  if(offer.stage==='choose')return '<div class="controlsText">'+(game.mode==='com'&&game.standbyKey==='B'?'裏向きの3枚から召喚する1枚を選んでください。':'相手が裏向きの3枚から選択中です。')+'</div>';
+  return '';
 }
 function drawControls(){
   var p = playerByKey(game.turnKey);
@@ -1920,6 +1962,7 @@ function responseCanActivate(info){
   if(k==='supportDefense')return game.responseActorKey===atk.defenderKey&&a.battleArea.length>=2;
   if(k==='lastStand')return attackParticipants(game.responseActorKey).length===1&&attackParticipants(playerKey(op)).length>=2;
   if(k==='lockZone')return lockableZoneSlotIndexes(op).length>0;
+  if(k==='skipAttack')return a.battleArea.length<op.battleArea.length;
   return true;
 }
 function validResponsePayload(info,payload){
@@ -2205,6 +2248,7 @@ function consumeStandbyCard(p,c){
   choice().standbyTargetUid = null;
   choice().summonDeckCid = null;
   choice().expansionActivated=false;
+  choice().reinforcement=null;
   choice().standbyEffect=null;
   choice().discard.clear();
 }
@@ -2237,33 +2281,54 @@ function activateExpansion(p,c,slot,deferResolution){
   var played=takeCard(p.mainHand,c.cid);if(!played)return;
   played.zoneSlot=slot;p.tempPlayed.push(played);
   window.dispatchEvent(new CustomEvent('duel:card-sound',{detail:{kind:'exp'}}));
-  var state=choice();state.standbyCard=played.cid;state.expansionActivated=true;state.standbyTargetUid=null;state.summonDeckCid=null;state.discard.clear();
+  var state=choice();state.standbyCard=played.cid;state.expansionActivated=true;state.standbyTargetUid=null;state.summonDeckCid=null;state.reinforcement=null;state.discard.clear();
   log(p.name+'：展開カード「'+cardDisplayName(played)+'」を作戦エリア'+(slot+1)+'番枠で発動');
   if(deferResolution)return;
   if(played.kind==='draw1'){resolveDrawOne(p,played);return;}
   if(played.kind==='draw2discard2'&&p.mainHand.length<2){log(p.name+'：手札が2枚未満のため「手札交換」を処理できない');consumeStandbyCard(p,played);return;}
-  if(played.kind==='searchCharacter'&&!p.mainDeck.some(function(x){return x.type==='character';})){log(p.name+'：メインデッキにサーチできるキャラがない');consumeStandbyCard(p,played);return;}
-  if((played.kind==='summon'||played.kind==='summonShuffleDraw')&&(!p.mainDeck.some(function(x){return x.type==='character';})||!openBattleSlotIndexes(p,false).length)){log(p.name+'：特殊召喚できるキャラまたは空き枠がない');finishExpansionAfterSummon(p,played);return;}
+  if(played.kind==='summonShuffleDraw'){beginReinforcement(p,played);return;}
+  if(played.kind==='summon'&&(!p.mainDeck.some(function(x){return x.type==='character';})||!openBattleSlotIndexes(p,false).length)){log(p.name+'：特殊召喚できるキャラまたは空き枠がない');finishExpansionAfterSummon(p,played);return;}
   if(played.kind==='growth'&&!p.battleArea.some(function(x){return x.level<3;})){log(p.name+'：強化できるキャラがいない');consumeStandbyCard(p,played);return;}
+  if(played.kind==='rapidGrowth'&&!p.battleArea.length){log(p.name+'：強化できるキャラがいない');consumeStandbyCard(p,played);return;}
   if(played.kind==='defensePrep'&&!p.mainDeck.length){resolveDefensePrep(p,played,null);return;}
   state.standbyEffect=played.kind;
   status(played.kind==='growth'?'強化するキャラを盤面で選んでください':played.kind==='draw2discard2'?'メインデッキに戻すカードを手札から2枚選んでください':'左のカード一覧から効果の対象を選んでください');
 }
 function useExpansionTarget(p,c,uid){
   var target = findChar(p,uid);
-  if(target && target.level<3){
-    target.level++;
+  if(target && (c.kind==='rapidGrowth'||target.level<3)){
+    target.level+=c.kind==='rapidGrowth'?2:1;
     log(p.name + '：展開カードで「' + target.name + '」をLv' + target.level + 'に強化');
   }
   consumeStandbyCard(p,c);
 }
-function searchCharacterToHand(p,c,deckCid){
-  var found=takeCard(p.mainDeck,deckCid);
-  if(found){
-    p.mainHand.push(found);
-    log(p.name + '：メインデッキから「' + found.name + '」を手札に加えた');
+function beginReinforcement(p,c){
+  var names=new Set(p.mainDeck.filter(function(x){return x.type==='character';}).map(function(x){return x.name;}));
+  if(names.size<3||!openBattleSlotIndexes(p,false).length){
+    log(p.name+'：「増援到着」は異なるキャラ3体または召喚先を用意できず、効果が無効');
+    consumeStandbyCard(p,c);return;
   }
-  consumeStandbyCard(p,c);
+  choice().reinforcement={stage:'pick',ids:[]};
+  status(p.name+'：デッキから異なるキャラ3体を選んで相手に見せてください');
+}
+function revealReinforcement(p){
+  var offer=choice().reinforcement;
+  if(!offer||offer.stage!=='pick'||offer.ids.length!==3)return;
+  var selected=offer.ids.map(function(id){return findCard(p.mainDeck,id);});
+  if(selected.some(function(x){return !x||x.type!=='character';})||new Set(selected.map(function(x){return x.name;})).size!==3)return;
+  offer.stage='reveal';
+  log(p.name+'：「増援到着」で'+selected.map(function(x){return x.name;}).join('／')+'を相手に公開');
+}
+function chooseReinforcement(index){
+  var offer=choice().reinforcement,p=playerByKey(game.standbyKey);
+  if(!offer||offer.stage!=='choose'||index<0||index>=offer.ids.length)return;
+  choice().summonDeckCid=offer.ids[index];
+  offer.stage='slot';
+  log(other(p).name+'：裏向きの候補から1枚を選択');
+  if(!openBattleSlotIndexes(p,false).length){
+    log(p.name+'：バトルエリアに空き枠がないため召喚できなかった');
+    var active=findCard(p.tempPlayed,choice().standbyCard);if(active)consumeStandbyCard(p,active);
+  }
 }
 function resolveDrawOne(p,c){
   consumeStandbyCard(p,c);
@@ -2289,6 +2354,7 @@ function resolveDefensePrep(p,c,trapCid){
   log(p.name+'：確認した残りのカードを戻してメインデッキをシャッフル');
 }
 function specialSummon(p,c,deckCid,slot){
+  if(c.kind==='summonShuffleDraw'&&(!choice().reinforcement||choice().reinforcement.stage!=='slot'||Number(deckCid)!==choice().summonDeckCid))return;
   slot=Number(slot);
   if(openBattleSlotIndexes(p,false).indexOf(slot)>=0){
     var dc = takeCard(p.mainDeck,deckCid);
@@ -2300,14 +2366,7 @@ function specialSummon(p,c,deckCid,slot){
   finishExpansionAfterSummon(p,c);
 }
 function finishExpansionAfterSummon(p,c){
-  var kind = c.kind;
   consumeStandbyCard(p,c);
-  if(kind === 'summonShuffleDraw'){
-    p.mainDeck = shuffle(p.mainDeck);
-    var drawn=p.mainDeck.length ? p.mainDeck.shift() : null;
-    if(drawn) p.mainHand.push(drawn);
-    log(p.name + '：メインデッキをシャッフルして' + (drawn ? label(drawn) + 'を1枚ドロー' : 'ドローできなかった'));
-  }
 }
 function resolveDrawTwo(p,c){
   var ids = Array.from(choice().discard).filter(function(cid){
@@ -2670,6 +2729,7 @@ function applyQueuedEffect(entry){
     return op.name+'の作戦エリア'+(lockSlot+1)+'番枠を、攻防連鎖の処理後に封鎖することが確定';
   }
   if(kind==='skipAttack'){
+    if(actor.battleArea.length>=op.battleArea.length)return '効果処理時に自分のキャラ数が相手より少なくないため不発';
     op.skipNextAttack=true;
     return op.name+'の次の攻撃宣言を1回スキップ';
   }
@@ -2973,6 +3033,13 @@ document.addEventListener('click',function(e){
   if(!b||(!b.closest('#controls,#decisionPanel,#deckActions,#selectionPanel,#ownHand')&&!b.closest('#autoPauseBtn'))||b.disabled||!game||setupTransitionPending)return;
   confirmHandsOff=b.dataset.handoff==='true';
   var a=b.dataset.action,cid=Number(b.dataset.cid),uid=Number(b.dataset.uid),c=choice();
+  if(game.state==='standby'&&c.reinforcement){
+    var stage=c.reinforcement.stage,owner=game.standbyKey;
+    var allowed=stage==='pick'&&owner==='A'?['pick-reinforcement','confirm-reinforcement']:
+      stage==='reveal'&&owner==='B'?['hide-reinforcement']:
+      stage==='choose'&&owner==='B'?['choose-reinforcement']:[];
+    if(game.mode==='auto'||(game.mode==='com'&&allowed.indexOf(a)<0&&a!=='toggle-auto'))return;
+  }
   if(a!=='toggle-auto')recordHistory();
   window.dispatchEvent(new CustomEvent('duel:action',{detail:{action:a}}));
   if(a==='toggle-opening-tactic'){
@@ -2990,15 +3057,25 @@ document.addEventListener('click',function(e){
     clearChoice();
   }
   else if(a==='choose-standby'){c.standbyCard=cid;c.standbyTargetUid=null;c.summonDeckCid=null;c.discard.clear();}
+  else if(a==='pick-reinforcement'){
+    var offered=c.reinforcement,owner=playerByKey(game.standbyKey),candidate=findCard(owner.mainDeck,cid);
+    if(offered&&offered.stage==='pick'&&candidate&&candidate.type==='character'){
+      var at=offered.ids.indexOf(cid);
+      if(at>=0)offered.ids.splice(at,1);
+      else if(offered.ids.length<3&&!offered.ids.some(function(id){return findCard(owner.mainDeck,id)?.name===candidate.name;}))offered.ids.push(cid);
+    }
+  }
+  else if(a==='confirm-reinforcement')revealReinforcement(playerByKey(game.standbyKey));
+  else if(a==='hide-reinforcement'){if(c.reinforcement&&c.reinforcement.stage==='reveal')c.reinforcement.stage='choose';}
+  else if(a==='choose-reinforcement')chooseReinforcement(Number(b.dataset.index));
   else if(a==='confirm-mulligan')confirmMulligan();
   else if(a==='summon-character'){var p=playerByKey(game.standbyKey),x=findCard(p.mainHand,c.standbyCard);if(x)summonCharacter(p,x,Number(b.dataset.slot));}
   else if(a==='set-trap'){var p=playerByKey(game.standbyKey),x=findCard(p.mainHand,c.standbyCard);if(x)setTrap(p,x);}
   else if(a==='discard-standby'){var p=playerByKey(game.standbyKey),x=takeCard(p.mainHand,c.standbyCard);if(x){sendToRetreat(p,x);log(p.name+'：'+label(x)+'を使用せず捨てた');}c.standbyCard=null;c.standbyTargetUid=null;c.summonDeckCid=null;c.discard.clear();}
   else if(a==='choose-exp-target')c.standbyTargetUid=uid;
   else if(a==='confirm-exp-target'){var p=playerByKey(game.standbyKey),x=findCard(p.mainHand,c.standbyCard);if(x&&c.standbyTargetUid!=null)useExpansionTarget(p,x,c.standbyTargetUid);}
-  else if(a==='choose-special-character'){c.summonDeckCid=cid||null;}
+  else if(a==='choose-special-character'){if(findCard(playerByKey(game.standbyKey).mainDeck,cid)?.type==='character')c.summonDeckCid=cid||null;}
   else if(a==='special-summon'){var p=playerByKey(game.standbyKey),x=findCard(p.mainHand,c.standbyCard);if(x)specialSummon(p,x,cid,Number(b.dataset.slot));}
-  else if(a==='search-character'){var p=playerByKey(game.standbyKey),x=findCard(p.tempPlayed,c.standbyCard);if(x)searchCharacterToHand(p,x,cid);}
   else if(a==='resolve-draw1'){var p=playerByKey(game.standbyKey),x=findCard(p.tempPlayed,c.standbyCard)||findCard(p.mainHand,c.standbyCard);if(x)resolveDrawOne(p,x);}
   else if(a==='resolve-defense-prep'||a==='resolve-defense-prep-empty'){
     var p=playerByKey(game.standbyKey),x=findCard(p.tempPlayed,c.standbyCard)||findCard(p.mainHand,c.standbyCard);
@@ -3175,6 +3252,7 @@ document.addEventListener('focusout',function(e){
 });
 function performStandbyBoardAction(node){
   var action=node._boardAction;if(!action||!game||game.state!=='standby')return;
+  if(game.mode==='auto'||game.mode==='com'&&game.standbyKey==='B')return;
   var p=playerByKey(game.standbyKey),c=choice(),card;
   recordHistory();window.dispatchEvent(new CustomEvent('duel:action',{detail:{action:action.kind}}));
   if(action.kind==='summonCharacter'){

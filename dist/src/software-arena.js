@@ -2,7 +2,7 @@ import {renderAttackArrows as drawAttackArrows} from './attack-arrows.js?v=54';
 import {renderBoardTargets,SLOT_WIDTH,SLOT_DEPTH} from './board-targets.js?v=2';
 import * as T from 'three';
 import {Arena} from './arena.js?v=55';
-import {palette,cardTexture} from './materials.js?v=33';
+import {palette,cardTexture} from './materials.js?v=78';
 
 // The same 3D board geometry and camera, drawn by the browser's ordinary canvas
 // when it cannot provide a WebGL context. This is a renderer, not another game.

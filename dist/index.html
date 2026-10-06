@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>DUEL ARENA | カードバトル</title>
-<link rel="stylesheet" href="./src/legacy.css?v=40"><link rel="stylesheet" href="./src/interface.css?v=76">
+<link rel="stylesheet" href="./src/legacy.css?v=40"><link rel="stylesheet" href="./src/interface.css?v=78">
 </head>
 <body>
 
@@ -57,7 +57,7 @@
         <ol>
           <li>メインデッキから7枚引きます。キャラが0枚なら手札をすべて公開し、デッキへ戻してシャッフルしてから7枚引き直します。</li>
           <li>キャラカードをバトルエリアへ出します。バトルエリアは1〜5番の固定枠で、召喚する側が配置先を選びます。キャラが場を離れても残りのキャラの位置は動きません。</li>
-          <li>展開カードでキャラの強化、召喚、ドロー、サーチなどを行います。展開カードによる攻撃力上昇は永続です。</li>
+          <li>展開カードでキャラの強化、召喚、ドローなどを行います。展開カードによる攻撃力上昇は永続です。増援到着では異なるキャラ3体を公開し、裏向きにして相手が選んだ1体を召喚します。3体揃わなければ効果は無効です。</li>
           <li>罠カードを作戦エリアへ裏向きで伏せます。作戦エリアは5枠です。</li>
           <li>残ったメイン手札もすべて処理し、手札が0枚になったらスタンバイを終了します。</li>
         </ol>
@@ -253,7 +253,7 @@
 
 
 <script type="importmap">{"imports":{"three":"./vendor/three.module.js"}}</script>
-<script src="./src/engine.js?v=77"></script>
-<script type="module" src="./src/boot.js?v=77"></script>
+<script src="./src/engine.js?v=78"></script>
+<script type="module" src="./src/boot.js?v=78"></script>
 </body>
 </html>

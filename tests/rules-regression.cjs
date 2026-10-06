@@ -3,7 +3,7 @@ const {JSDOM}=require('jsdom'),fs=require('fs'),path=require('path'),assert=requ
 const root=path.resolve(__dirname,'../dist');
 const dom=new JSDOM(fs.readFileSync(root+'/index.html','utf8'),{runScripts:'outside-only',url:'https://test.invalid'}),w=dom.window,d=w.document;
 w.requestAnimationFrame=()=>0;w.confirm=()=>true;w.HTMLElement.prototype.scrollIntoView=function(){};
-const api=['newPlayer','card','choice','clearChoice','render','runComStep','comStandbyStep','startGame','comResponsePlan','consumeResponse','finishResponsePlay','resolveNextEffect','finishAttack','resolvePeekSelection','acknowledgePeek','beginResolution','applyQueuedEffect','declareAttack','resolveAttack','resolveTieVictim','attackPass','resolvePenalty','resolveTurnDraw','completeHumanTacticSelection','autoSelectOpeningTactics','activateExpansion','useExpansionTarget','specialSummon','searchCharacterToHand','resolveDrawTwo','resolveDefensePrep','responseCanActivate','validResponsePayload','finishStandby','comActionPending','captureSnapshot','openTacticSlotIndexes','beginTurn','recordHistory','undoOne','redoOne'];
+const api=['newPlayer','card','choice','clearChoice','render','runComStep','comStandbyStep','startGame','comResponsePlan','consumeResponse','finishResponsePlay','resolveNextEffect','finishAttack','resolvePeekSelection','acknowledgePeek','beginResolution','applyQueuedEffect','declareAttack','resolveAttack','resolveTieVictim','attackPass','resolvePenalty','resolveTurnDraw','completeHumanTacticSelection','autoSelectOpeningTactics','activateExpansion','useExpansionTarget','specialSummon','beginReinforcement','revealReinforcement','chooseReinforcement','resolveDrawTwo','resolveDefensePrep','responseCanActivate','validResponsePayload','finishStandby','comActionPending','captureSnapshot','openTacticSlotIndexes','beginTurn','recordHistory','undoOne','redoOne'];
 let src=fs.readFileSync(root+'/src/engine.js','utf8').replace("var game = null;","var game = null;var testBulk=false;")
 .replace('function render(){','function render(){if(testBulk)return;')
 .replace('function log(text, cls){','function log(text, cls){if(testBulk)return;')
@@ -15,6 +15,7 @@ function paint(){t.render();ui.sync();assert(d.querySelector('#deckActions').chi
 function click(action,where=''){const el=d.querySelector(`${where} [data-action="${action}"]`);assert(el,`Missing visible action ${action}`);assert(!el.disabled,`Disabled ${action}`);el.click();paint();}
 function character(uid,level,slot,name='unit'+uid){return {uid,type:'character',name,level,battleSlot:slot};}
 function scenario(){t.reset();t.startGame('com','A');const g=t.get();for(const p of [g.A,g.B]){p.battleArea=[];p.trapZone=[];p.tempPlayed=[];p.retreat=[];p.exclusion=[];p.tacticHand=[];p.tacticDrawPool=[];p.lockedSlotIndexes=[];p.pendingLockedSlotIndexes=[];p.standbyComplete=true;p.tacticSelected=true;}g.A.battleArea=[character(1001,2,0),character(1002,1,1),character(1003,1,2)];g.B.battleArea=[character(2001,2,0),character(2002,1,1),character(2003,1,2)];g.state='response';g.turnKey='A';g.responseActorKey='B';g.attack={attackerKey:'A',defenderKey:'B',attackerUids:[1001],allAttackerUids:[1001],targetUid:2001,mods:{},usedTraps:new w.Set(),chainHistory:[],displayHistory:[],resolutionIndex:-1,consecutivePasses:0,pendingPeekIndex:null,pendingPeekAcknowledgementIndex:null};t.clearChoice();return g;}
+{const p=t.newPlayer('deck',true,['a','b','c','d','e']),main=p.mainDeck;assert.equal(main.length,40);const count=kind=>main.filter(x=>x.kind===kind).length;for(const [kind,n] of Object.entries({growth:3,rapidGrowth:1,summon:2,summonShuffleDraw:3,draw2discard2:3,draw1:2,defensePrep:2,levelDown:2,lockZone:1,reviveFromRetreat:1,removePower1:1,skipAttack:1,forceEnd:1,splitAttack:2}))assert.equal(count(kind),n,kind);assert.equal(count('searchCharacter'),0);console.log('PASS main deck: 40 cards, revisions and limits');}
 {const g=scenario();g.mode='auto';g.autoPaused=false;t.recordHistory();g.turnCount=42;g.autoPaused=true;t.undoOne();assert.equal(t.get().autoPaused,true,'undo keeps playback paused');t.redoOne();assert.equal(t.get().autoPaused,true,'redo keeps playback paused');assert.equal(t.get().turnCount,42);console.log('PASS playback: undo and redo preserve pause');}
 {const g=scenario();g.state='gameOver';g.mode='com';w.dispatchEvent(new w.CustomEvent('duel:victory-se-start'));t.render();assert(d.querySelector('[data-action="next-game"]').disabled,'next game waits for victory SE');w.dispatchEvent(new w.CustomEvent('duel:victory-se-end'));assert(d.querySelector('[data-action="next-game"]').disabled);const original=w.Date.now;w.Date.now=()=>original()+1100;t.render();assert(!d.querySelector('[data-action="next-game"]').disabled,'next game unlocks one second after SE');w.Date.now=original;console.log('PASS victory: next game waits for full SE and one more second');}
 function entry(kind,actorKey='B',payload={}){return {kind,actorKey,payload,src:'tactic',status:'pending',player:actorKey,card:kind};}
@@ -106,14 +107,44 @@ effect('supportDefense',null,g=>{assert.equal(g.attack.mods[2002],-1);assert.equ
 effect('lastStand',g=>g.attack.attackerUids=[1001,1002],g=>assert.equal(g.attack.mods[2001],2));
 effect('removePower1',null,g=>assert.equal(g.A.exclusion[0].uid,1002),{targetUid:1002});
 effect('lockZone',null,g=>assert.equal(g.A.pendingLockedSlotIndexes[0],4),{lockSlot:4});
-effect('skipAttack',null,g=>assert(g.A.skipNextAttack));
+effect('skipAttack',g=>{g.B.battleArea.pop();},g=>assert(g.A.skipNextAttack));
+effect('skipAttack',null,g=>assert.equal(g.A.skipNextAttack,false));
 effect('forceEnd',null,g=>assert.equal(g.attack.attackerUids.length,1));
 // Unusable cards and payload bypasses must be rejected, not consumed.
 for(const kind of ['revive','recycle','peek2','drawTactic2','strategyShift','negateTrap','splitAttack','lastStand']){const g=scenario(),c=t.card('tactic',{kind,chain:false});g.B.tacticHand=[c];assert.equal(t.responseCanActivate({src:'tactic',card:c}),false,kind);assert.equal(t.consumeResponse({src:'tactic',card:c},{empty:true,zoneSlot:0}),false,kind);assert.equal(g.B.tacticHand.length,1);targeted++;}
 // Last free tactic slot remains usable after placing a targeted card.
 {const g=scenario(),c=t.card('tactic',{kind:'buff1',chain:false});g.B.tempPlayed=[Object.assign(c,{zoneSlot:4,pendingPlacement:true})];g.B.trapZone=Array.from({length:4},(_,i)=>t.card('trap',{kind:'levelDown',zoneSlot:i}));assert(t.consumeResponse({src:'tactic',card:c},{targetUid:2001,zoneSlot:4}));assert.equal(g.attack.chainHistory.length,1);targeted++;}
 // All seven expansion effects through the same placement path a human uses.
-for(const kind of ['growth','summon','summonShuffleDraw','draw2discard2','draw1','searchCharacter','defensePrep']){const g=scenario(),p=g.A;g.state='standby';g.standbyKey='A';const c=t.card('exp',{kind});p.mainHand=[c,t.card('character',{name:'spare1'}),t.card('character',{name:'spare2'})];p.mainDeck=[t.card('trap',{kind:'levelDown'}),t.card('character',{name:'new1'}),t.card('character',{name:'new2'}),t.card('exp',{kind:'draw1'})];t.activateExpansion(p,c,0);if(kind==='growth')t.useExpansionTarget(p,c,1002);if(kind==='summon'||kind==='summonShuffleDraw')t.specialSummon(p,c,p.mainDeck.find(x=>x.type==='character').cid,4);if(kind==='searchCharacter')t.searchCharacterToHand(p,c,p.mainDeck.find(x=>x.type==='character').cid);if(kind==='draw2discard2'){t.choice().discard=new w.Set(p.mainHand.map(x=>x.cid));t.resolveDrawTwo(p,c);}if(kind==='defensePrep')t.resolveDefensePrep(p,c,p.mainDeck[0].cid);assert(!p.tempPlayed.length);assert(p.retreat.some(x=>x.cid===c.cid));if(kind==='growth')assert.equal(p.battleArea[1].level,2);if(kind==='summon'||kind==='summonShuffleDraw')assert.equal(p.battleArea.length,4);if(kind==='draw1'||kind==='searchCharacter'||kind==='summonShuffleDraw')assert.equal(p.mainHand.length,3);if(kind==='draw2discard2')assert.equal(p.mainHand.length,2);if(kind==='defensePrep')assert.equal(p.trapZone.length,1);targeted++;}
+for(const kind of ['growth','rapidGrowth','summon','summonShuffleDraw','draw2discard2','draw1','defensePrep']){
+ const g=scenario(),p=g.A;g.state='standby';g.standbyKey='A';const c=t.card('exp',{kind});
+ p.mainHand=[c,t.card('character',{name:'spare1'}),t.card('character',{name:'spare2'})];
+ p.mainDeck=[t.card('trap',{kind:'levelDown'}),...['new1','new2','new3'].map(name=>t.card('character',{name})),t.card('exp',{kind:'draw1'})];
+ t.activateExpansion(p,c,0);
+ if(kind==='growth'||kind==='rapidGrowth')t.useExpansionTarget(p,c,1002);
+ if(kind==='summon')t.specialSummon(p,c,p.mainDeck.find(x=>x.type==='character').cid,4);
+ if(kind==='summonShuffleDraw'){
+  const chosen=p.mainDeck.filter(x=>x.type==='character').map(x=>x.cid);t.choice().reinforcement.ids=chosen;t.revealReinforcement(p);
+  assert.equal(t.choice().reinforcement.stage,'reveal');t.choice().reinforcement.stage='choose';t.chooseReinforcement(1);
+  assert.equal(t.choice().reinforcement.stage,'slot');t.specialSummon(p,c,chosen[1],4);
+ }
+ if(kind==='draw2discard2'){t.choice().discard=new w.Set(p.mainHand.map(x=>x.cid));t.resolveDrawTwo(p,c);}
+ if(kind==='defensePrep')t.resolveDefensePrep(p,c,p.mainDeck[0].cid);
+ assert(!p.tempPlayed.length);assert(p.retreat.some(x=>x.cid===c.cid));
+ if(kind==='growth')assert.equal(p.battleArea[1].level,2);
+ if(kind==='rapidGrowth')assert.equal(p.battleArea[1].level,3);
+ if(kind==='summon'||kind==='summonShuffleDraw')assert.equal(p.battleArea.length,4);
+ if(kind==='summonShuffleDraw')assert.equal(p.mainHand.length,2,'reinforcement no longer draws');
+ if(kind==='draw1')assert.equal(p.mainHand.length,3);
+ if(kind==='draw2discard2')assert.equal(p.mainHand.length,2);
+ if(kind==='defensePrep')assert.equal(p.trapZone.length,1);
+ targeted++;
+}
+// Reinforcement fails when fewer than three distinct names remain.
+{const g=scenario(),p=g.A;g.state='standby';g.standbyKey='A';const c=t.card('exp',{kind:'summonShuffleDraw'});p.mainHand=[c];p.mainDeck=[t.card('character',{name:'x'}),t.card('character',{name:'x'}),t.card('character',{name:'y'})];t.activateExpansion(p,c,0);assert(p.retreat.includes(c));assert(!t.choice().reinforcement);targeted++;}
+// Both sides of the human/COM selection: visual fronts first, then indistinguishable backs.
+t.bulk(false);
+for(const owner of ['A','B']){const g=scenario(),p=g[owner];g.mode='com';g.state='standby';g.standbyKey=owner;const c=t.card('exp',{kind:'summonShuffleDraw'});p.mainHand=[c];p.mainDeck=['x','y','z'].map(name=>t.card('character',{name}));t.activateExpansion(p,c,0);if(owner==='B'){t.comStandbyStep();assert.equal(t.choice().reinforcement.stage,'reveal');paint();assert.equal(d.querySelectorAll('#selectionPanel .selectionCard').length,3);click('hide-reinforcement','#deckActions');}else {const cards=p.mainDeck;for(const x of cards){paint();d.querySelector('#selectionPanel [data-cid="'+x.cid+'"]').click();}paint();click('confirm-reinforcement','#deckActions');t.comStandbyStep();paint();}assert.equal(t.choice().reinforcement.stage,'choose');assert.equal(d.querySelectorAll('#selectionPanel .reinforcementBack').length,3);if(owner==='B'){d.querySelector('#selectionPanel .reinforcementBack').click();paint();assert.equal(t.choice().reinforcement.stage,'slot');}else{assert(t.comActionPending());t.comStandbyStep();}assert.equal(t.choice().reinforcement.stage,'slot');targeted++;}
+t.bulk(true);
 // Independent combat oracle for single and combined attacks, including temporary modifiers.
 {const g=scenario();g.B.battleArea[0].level=0;g.attack.mods[2001]=1;t.bulk(false);t.render();const slot=d.querySelector('#oppBattle .slot[data-uid="2001"]');assert.equal(slot.dataset.basePower,'0');assert.equal(slot.dataset.tempMod,'1');assert.equal(slot.querySelector('.powerValue').textContent,'Lv. 1');assert(slot.querySelector('.powerBase').textContent.includes('元Lv. 0'));t.bulk(true);}
 {const g=scenario();g.attack.mods[2001]=0;t.bulk(false);t.render();let slot=d.querySelector('#oppBattle .slot[data-uid="2001"]');assert.equal(slot.dataset.tempActive,'true');assert(slot.querySelector('.powerBase').textContent.includes('一時±0'));g.attack.mods[2001]=-1;t.render();slot=d.querySelector('#oppBattle .slot[data-uid="2001"]');assert(slot.querySelector('.powerBase').textContent.includes('一時-1'));t.bulk(true);}
@@ -141,7 +172,7 @@ for(const count of [1,2,3]){const g=scenario();g.state='attackDeclare';g.turnKey
 console.log(`PASS targeted: ${targeted} card/legality cases, ${battles} combat cases`);
 // 500 seeded COM games. Human side is automated by a legal-choice driver;
 // COM uses its actual production decision policy. Rendering is omitted in this batch only.
-function invariant(g,seed,step){for(const key of ['A','B']){const p=g[key],zones=['mainDeck','mainHand','tacticDeck','tacticDrawPool','tacticHand','battleArea','trapZone','tempPlayed','retreat','exclusion'];const all=zones.flatMap(z=>p[z]);assert.equal(all.length,60,`conservation ${seed}/${step}/${key}`);assert.equal(all.filter(x=>x.type==='tactic').length,20);const ids=all.filter(x=>x.cid!=null).map(x=>x.cid);assert.equal(new Set(ids).size,ids.length,'duplicate card');assert(p.battleArea.length<=5);assert.equal(new Set(p.battleArea.map(x=>x.battleSlot)).size,p.battleArea.length);assert(p.trapZone.length+p.tempPlayed.length+p.lockedSlotIndexes.length<=5);assert.equal(new Set(p.trapZone.concat(p.tempPlayed).map(x=>x.zoneSlot)).size,p.trapZone.length+p.tempPlayed.length);if(g.state==='turnDraw')for(const c of p.battleArea)assert(c.level>0&&c.level<=3);}}
+function invariant(g,seed,step){for(const key of ['A','B']){const p=g[key],zones=['mainDeck','mainHand','tacticDeck','tacticDrawPool','tacticHand','battleArea','trapZone','tempPlayed','retreat','exclusion'];const all=zones.flatMap(z=>p[z]);assert.equal(all.length,60,`conservation ${seed}/${step}/${key}`);assert.equal(all.filter(x=>x.type==='tactic').length,20);const ids=all.filter(x=>x.cid!=null).map(x=>x.cid);assert.equal(new Set(ids).size,ids.length,'duplicate card');assert(p.battleArea.length<=5);assert.equal(new Set(p.battleArea.map(x=>x.battleSlot)).size,p.battleArea.length);assert(p.trapZone.length+p.tempPlayed.length+p.lockedSlotIndexes.length<=5);assert.equal(new Set(p.trapZone.concat(p.tempPlayed).map(x=>x.zoneSlot)).size,p.trapZone.length+p.tempPlayed.length);if(g.state==='turnDraw')for(const c of p.battleArea)assert(c.level>0&&c.level<=5);}}
 let totalSteps=0,maxSteps=0,scouts=0;
 for(let seed=1;seed<=500;seed++){let rng=seed;w.Math.random=()=>((rng=(Math.imul(rng,1664525)+1013904223)>>>0)/4294967296);t.reset();t.startGame('com',seed%2?'A':'B');let step=0;
  for(;step<2000;step++){const g=t.get();if(['gameOver','matchOver'].includes(g.state))break;
@@ -154,5 +185,7 @@ for(let seed=1;seed<=500;seed++){let rng=seed;w.Math.random=()=>((rng=(Math.imul
  assert(step<2000,`stalled game seed ${seed}, state ${t.get().state}`);totalSteps+=step;maxSteps=Math.max(maxSteps,step);
  if(seed%100===0)console.log(`PASS ${seed}/500 games`);
 }
+// COM spectators: both sides advance automatically through reinforcement choices and resolution.
+for(let seed=1;seed<=100;seed++){let rng=seed+9000;w.Math.random=()=>((rng=(Math.imul(rng,1664525)+1013904223)>>>0)/4294967296);t.reset();t.startGame('auto',seed%2?'A':'B');let step=0;for(;step<2000;step++){const g=t.get();if(['gameOver','matchOver'].includes(g.state))break;t.runComStep();invariant(t.get(),'auto'+seed,step);}assert(step<2000,`auto mode stalled seed ${seed}, ${t.get().state}`);}console.log('PASS 100/100 COM spectator games');
 const report={games:500,totalSteps,maxSteps,humanScoutSelections:scouts,targetedCardCases:targeted,combatCases:battles,effectCoverage:w.effectCoverage};
 console.log(JSON.stringify(report,null,2));dom.window.close();
