@@ -42,6 +42,7 @@ export class DuelAudio{
   }));
   this.ctx=null;this.musicSource=null;this.musicSourceGain=null;this.musicSourcePhase=null;this.musicGain=null;
   this.active=false;this.paused=false;this.victoryHold=false;this.victoryToken=0;this.quietUntil=0;this.last={};
+  this.introPrimed=false;this.musicPlayPending=null;
   this.music.addEventListener('error',()=>{
    const track=this.musicTracks[this.musicPhase];
    if(track && track.url.endsWith('.ogg')){
@@ -52,6 +53,7 @@ export class DuelAudio{
   this.bindControls();
   document.addEventListener('visibilitychange',()=>{if(document.hidden)this.pauseMusic();else this.resumeMusic();});
   window.addEventListener('pagehide',()=>this.pauseMusic());
+  window.addEventListener('pageshow',()=>this.resumeMusic());
  }
  bindControls(){
   const musicToggle=document.getElementById('bgmToggle'),seToggle=document.getElementById('seToggle');
@@ -72,8 +74,15 @@ export class DuelAudio{
   if(this.ctx.state==='suspended')this.ctx.resume().catch(()=>{});
  }
  start(){this.unlock();this.active=true;this.syncPhase(window.DuelEngine?.view());this.resumeMusic();this.play('turn');}
+ startIntro(){
+  // Start the streaming track in the start button's user activation, before loading the arena.
+  this.introPrimed=false;
+  this.resetForGame({mode:'com',state:'coinToss',autoPaused:false,battlePhaseAnnounced:false});
+  this.introPrimed=true;this.active=true;this.unlock();this.resumeMusic();
+ }
  stop(){this.active=false;this.pauseMusic();}
  resetForGame(view){
+  if(this.introPrimed){this.introPrimed=false;this.syncPhase(view);return;}
   this.victoryToken++;this.victoryHold=false;
   this.pauseMusic();
   for(const player of this.effectSamples.win)player.pause();
@@ -88,13 +97,17 @@ export class DuelAudio{
   this.paused=view.mode==='auto'&&!!view.autoPaused;
   if(this.paused){this.pauseMusic();}
   const phase=!view.battlePhaseAnnounced&&['coinToss','standby','mulliganConfirm','awaitTacticSelection'].includes(view.state)?'standby':'battle';
-  if(phase===this.musicPhase){if(wasPaused&&!this.paused)this.resumeMusic();return;}
+  if(phase===this.musicPhase){
+   if((wasPaused&&!this.paused)||(this.active&&!this.paused&&this.musicPlayers[phase]?.paused&&!this.musicPlayPending))this.resumeMusic();
+   return;
+  }
   this.musicPhase=phase;
   if(this.active&&!this.paused)this.resumeMusic();
  }
  pauseMusic(){
   if(this.musicSource){this.musicSource.stop();this.musicSource.disconnect();this.musicSource=null;this.musicSourceGain=null;this.musicSourcePhase=null;}
   for(const player of Object.values(this.musicPlayers))player.pause();
+  this.musicPlayPending=null;
  }
  setMusicVolume(){
   const volume=this.musicEnabled?(this.musicVolume/100)*(performance.now()<this.quietUntil ? .57 : 1):0;
@@ -121,6 +134,7 @@ export class DuelAudio{
   if(track.streaming){
    const phase=this.musicPhase,player=this.musicPlayers[phase];
    this.music=player;
+   if(this.musicPlayPending&&this.musicPlayPending.phase!==phase)this.musicPlayPending=null;
    // The previous phase keeps playing while the preloaded track starts.
    const finishSwitch=()=>{
     if(this.musicPhase!==phase||!this.active||this.paused||!this.musicEnabled||document.hidden){
@@ -129,7 +143,11 @@ export class DuelAudio{
     }
     for(const other of Object.values(this.musicPlayers))if(other!==player)other.pause();
    };
-   if(player.paused)player.play().then(finishSwitch).catch(()=>{});
+   if(player.paused&&!this.musicPlayPending){
+    const attempt=player.play();
+    const pending={phase,attempt};this.musicPlayPending=pending;
+    attempt.then(finishSwitch).catch(()=>{}).finally(()=>{if(this.musicPlayPending===pending)this.musicPlayPending=null;});
+   }
    else finishSwitch();
    return;
   }

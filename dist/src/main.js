@@ -1,7 +1,7 @@
 import {Arena} from './arena.js?v=76';
 import {SoftwareArena} from './software-arena.js?v=76';
 import {cardTexture,cardFaceReady} from './materials.js?v=79';
-import {DuelAudio} from './audio.js?v=77';
+import {DuelAudio} from './audio.js?v=80';
 import {createDecisionUI} from './decision-ui.js?v=79';
 const $=id=>document.getElementById(id);
 function fitVisibleScreen(){
@@ -17,7 +17,7 @@ window.addEventListener('duel:log',event=>sound.onLog(event.detail.text));
 window.addEventListener('duel:action',event=>sound.onAction(event.detail.action));
 window.addEventListener('duel:response-card',event=>sound.play(event.detail.src==='trap'?'trap':'tactic'));
 window.addEventListener('duel:card-sound',event=>sound.play(event.detail.kind));
-document.addEventListener('pointerdown',()=>sound.unlock(),{capture:true,passive:true});
+document.addEventListener('pointerdown',()=>{sound.unlock();sound.resumeMusic();},{capture:true,passive:true});
 const stage=$('battleStage'),rail=$('activeFlowRail'),inspector=$('cardInspector'),side=document.querySelector('.sideColumn'),history=$('chainHistoryShell');
 history.prepend(rail);const chainHeading=document.createElement('strong');chainHeading.className='chainPanelHeading';chainHeading.textContent='攻防連鎖';history.prepend(chainHeading);stage.prepend(history);stage.append(side,$('historyArea'),$('ownSelectedTacticPreview'));
 // The engine keeps this inspector current during resolution; the visible preview uses its text.
@@ -239,6 +239,7 @@ async function startWithIntro(mode){
  startTitle.textContent='GAME START';startTitle.hidden=false;
  startOrder.textContent=`先攻：${playerName(firstKey)}　／　後攻：${playerName(firstKey==='A'?'B':'A')}`;startOrder.hidden=false;
  startLoading.textContent='盤面を準備中…';startLoading.hidden=false;
+ sound.startIntro();
  const shownAt=performance.now();
  try{
   // Let the browser paint the black start screen before starting or waiting on rendering work.
@@ -260,6 +261,7 @@ async function startWithIntro(mode){
   startOverlay.hidden=true;startOverlay.classList.remove('phaseReveal');document.body.classList.remove('gameStarting');window.DuelEngine.setStartupPending(false);startingGame=false;
  }catch(error){
   console.error('Game start sequence failed',error);
+  sound.stop();
   startOverlay.hidden=true;document.body.classList.remove('gameStarting');window.DuelEngine.setStartupPending(false);startingGame=false;
   warn('盤面の準備に失敗しました。ページを再読み込みしてください。');
  }
