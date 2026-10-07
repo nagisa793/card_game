@@ -1,4 +1,4 @@
-import('./main.js?v=83').catch(error=>{
+import('./main.js?v=88').catch(error=>{
  console.error('3D startup failed',error);
  const box=document.getElementById('arenaNotice');
  const noWebGL=/WebGL2 context unavailable|Error creating WebGL context/i.test(String(error));

@@ -1,6 +1,6 @@
 import {Arena} from './arena.js?v=76';
 import {SoftwareArena} from './software-arena.js?v=76';
-import {cardTexture,cardFaceReady} from './materials.js?v=79';
+import {cardTexture,cardFaceReady} from './materials.js?v=85';
 import {DuelAudio} from './audio.js?v=80';
 import {createDecisionUI} from './decision-ui.js?v=79';
 const $=id=>document.getElementById(id);
@@ -37,6 +37,14 @@ function switchDrawer(name){
 controlsToggle.addEventListener('click',()=>switchDrawer('controls'));
 historyToggle.addEventListener('click',()=>switchDrawer('history'));
 stage.dataset.drawer='';controlsToggle.setAttribute('aria-expanded','false');historyToggle.setAttribute('aria-expanded','false');
+document.addEventListener('click',event=>{
+ const open=stage.dataset.drawer;
+ if(!open||event.target.closest?.('.boardDock'))return;
+ if(event.target.closest?.(open==='controls'?'.sideColumn':'#historyArea'))return;
+ stage.dataset.drawer='';
+ controlsToggle.setAttribute('aria-expanded','false');
+ historyToggle.setAttribute('aria-expanded','false');
+},true);
 const decisions=createDecisionUI(stage,$('controls'));
 window.addEventListener('duel:action',event=>{
  if(['choose-standby','choose-response-card'].includes(event.detail.action))decisions.open();
@@ -117,6 +125,35 @@ try{
 }
 const imageCache=new Map();
 function artwork(type,title,effect=''){const key=type+'|'+title+'|'+effect;if(!imageCache.has(key))imageCache.set(key,cardTexture(type,title,effect).image.toDataURL('image/webp',.95));return imageCache.get(key);}
+const catalogButton=$('cardCatalogBtn'),catalogOverlay=$('cardCatalogOverlay'),catalogBody=$('cardCatalogBody'),catalogClose=$('cardCatalogClose');
+const catalogObserver=typeof IntersectionObserver==='function'?new IntersectionObserver(entries=>{
+ for(const entry of entries)if(entry.isIntersecting){const picture=entry.target,card=picture._catalogCard;picture.src=artwork(card.type,card.title,card.effect);catalogObserver.unobserve(picture);}
+},{root:catalogBody,rootMargin:'200px'}):null;
+function renderCatalog(){
+ catalogObserver?.disconnect();
+ const fragment=document.createDocumentFragment();
+ for(const group of window.DuelEngine.cardCatalog()){
+  const section=document.createElement('section');section.className='cardCatalogSection';
+  const heading=document.createElement('h3');heading.textContent=group.title;section.append(heading);
+  const grid=document.createElement('div');grid.className='cardCatalogGrid';
+  for(const card of group.cards){
+   const item=document.createElement('article');item.className='catalogCard';
+   const picture=document.createElement('img');picture.alt=card.title+'のカード';picture.loading='lazy';picture._catalogCard=card;
+   const name=document.createElement('strong');name.textContent=card.title;
+   const count=document.createElement('small');count.textContent=card.side+'／デッキ内 '+card.count+'枚';
+   const effect=document.createElement('p');effect.textContent=card.effect;
+   item.append(picture,name,count,effect);grid.append(item);
+  }
+  section.append(grid);fragment.append(section);
+ }
+ catalogBody.replaceChildren(fragment);
+ for(const picture of catalogBody.querySelectorAll('.catalogCard img')){if(catalogObserver)catalogObserver.observe(picture);else{const card=picture._catalogCard;picture.src=artwork(card.type,card.title,card.effect);}}
+}
+function setCatalogOpen(open){catalogOverlay.hidden=!open;catalogButton.setAttribute('aria-expanded',String(open));window.DuelEngine.setCatalogOpen(open);if(open){renderCatalog();catalogClose.focus();}else catalogButton.focus();}
+catalogButton.addEventListener('click',()=>setCatalogOpen(true));catalogClose.addEventListener('click',()=>setCatalogOpen(false));
+catalogOverlay.addEventListener('click',event=>{if(event.target===catalogOverlay)setCatalogOpen(false);});
+catalogOverlay.addEventListener('keydown',event=>{if(event.key==='Escape'){event.preventDefault();setCatalogOpen(false);}if(event.key==='Tab'){const target=event.shiftKey?catalogClose:catalogClose;event.preventDefault();target.focus();}});
+window.addEventListener('duel:art-loaded',()=>{if(!catalogOverlay.hidden){imageCache.clear();renderCatalog();}});
 let inspectSignature='';
 let lastDecisionState=null;
 const PHASE_DISPLAY_MS=2000;

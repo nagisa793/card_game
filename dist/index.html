@@ -4,17 +4,17 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>DUEL ARENA | カードバトル</title>
-<link rel="stylesheet" href="./src/legacy.css?v=40"><link rel="stylesheet" href="./src/interface.css?v=78">
+<link rel="stylesheet" href="./src/legacy.css?v=40"><link rel="stylesheet" href="./src/interface.css?v=88">
 </head>
 <body>
 
 <div class="top-bar">
   <a class="brand" href="./index.html"><span>◇</span> DUEL ARENA</a><h1 id="simTitle" hidden></h1>
   <div>
+    <button id="cardCatalogBtn" class="utilityBtn" type="button" aria-controls="cardCatalogOverlay" aria-expanded="false">カード一覧</button>
     <button id="rulesBtn" type="button" aria-controls="rulesOverlay" aria-expanded="false">ルール説明</button>
     <button id="comStartBtn">対COMバージョン</button>
     <button id="autoStartBtn">COM同士を観戦</button>
-    <button id="autoPauseBtn" class="autoPauseBtn" data-action="toggle-auto" type="button" hidden>⏸ 一時停止</button>
     <button id="settingsBtn" class="utilityBtn" type="button" aria-controls="settingsOverlay" aria-expanded="false">演出設定</button>
     <button id="chainToggleBtn" class="utilityBtn" type="button" aria-controls="chainHistoryShell" aria-expanded="true">攻防連鎖を畳む</button>
     <button id="historyToggleBtn" class="utilityBtn" type="button" aria-controls="historyArea" aria-expanded="true">履歴を畳む</button>
@@ -23,8 +23,16 @@
     <span class="historyControls">
       <button id="undoBtn" class="historyBtn" disabled title="直前の操作前へ戻る">↶ 一つ戻る</button>
       <button id="redoBtn" class="historyBtn" disabled title="戻した操作をもう一度進める">↷ 一つ進む</button>
+      <button id="autoPauseBtn" class="autoPauseBtn historyBtn" type="button" hidden>⏸ 一時停止</button>
     </span>
   </div>
+</div>
+
+<div class="cardCatalogOverlay" id="cardCatalogOverlay" hidden>
+  <section class="cardCatalogDialog" role="dialog" aria-modal="true" aria-labelledby="cardCatalogTitle">
+    <header class="cardCatalogHeader"><h2 id="cardCatalogTitle">カード一覧</h2><button id="cardCatalogClose" type="button">閉じる</button></header>
+    <div class="cardCatalogBody" id="cardCatalogBody"></div>
+  </section>
 </div>
 
 <div class="rulesOverlay" id="rulesOverlay" hidden>
@@ -86,7 +94,7 @@
           <li>発動した戦術・罠カードは攻防連鎖の効果と戦闘結果の処理が終わるまで作戦エリアに残り、その後まとめて撤退エリアへ移ります。</li>
           <li>確定した効果は<b>最後に発動したカードから最初のカードへ</b>逆順で処理します。</li>
         </ul>
-        <p class="rulesNote">一時的な効果でLv0になっても、それだけでは撤退しません。攻撃結果の処理後、元Lvが永続的に0のキャラは撤退します。「消えない裂傷」は効果処理時にLv0の対象を除外します。</p>
+        <p class="rulesNote">一時的な効果でLv0になっても、それだけでは撤退しません。攻撃結果の処理後、元Lvが永続的に0のキャラは撤退します。「消えない裂傷」は対象の元Lvを効果処理時に永続−1し、その時点で攻撃力が0なら直ちに撤退させます。</p>
       </section>
 
       <section class="rulesSection">
@@ -254,7 +262,7 @@
 
 
 <script type="importmap">{"imports":{"three":"./vendor/three.module.js"}}</script>
-<script src="./src/engine.js?v=83"></script>
-<script type="module" src="./src/boot.js?v=83"></script>
+<script src="./src/engine.js?v=87"></script>
+<script type="module" src="./src/boot.js?v=88"></script>
 </body>
 </html>

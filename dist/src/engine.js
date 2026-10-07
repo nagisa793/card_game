@@ -72,7 +72,7 @@ var TRAP_LABEL = {
   levelDown:'罠：相手キャラの攻撃力を永続-1',
   lockZone:'罠：相手の空き枠か表向きカードの枠を指定し、攻防連鎖の全効果処理後に封鎖',
   reviveFromRetreat:'罠：自分の撤退エリアからキャラ1体をLv1で召喚',
-  removePower1:'罠：相手の場のキャラ1体を選び、効果処理時に攻撃力0なら除外',
+  removePower1:'罠：相手の場のキャラ1体の元Lvを永続−1。効果処理時に攻撃力0なら直ちに撤退',
   skipAttack:'罠：自分のキャラが相手より少ないとき、次の相手の攻撃宣言をスキップ',
   forceEnd:'罠：攻防を強制終了',
   splitAttack:'罠：3体以上の攻撃から1体をその攻防だけ外す'
@@ -734,7 +734,7 @@ function chainTargetDescription(entry){
     items=participantReferences(entry.actorKey);
     return '対象：'+(items.length?items.join('・'):actor.name+'側の参加キャラなし')+'（単騎条件を確認）';
   }
-  if(entry.kind==='removePower1') return '対象：'+(target||'指定した相手キャラなし')+'（処理時に攻撃力0なら除外）';
+  if(entry.kind==='removePower1') return '対象：'+(target||'指定した相手キャラなし')+'（処理時に永続−1、攻撃力0なら撤退）';
   if(entry.kind==='lockZone') return '指定：'+op.name+'の作戦エリア'+(Number(payload.lockSlot)+1)+'番枠';
   if(entry.kind==='skipAttack') return '対象：'+op.name+'の次の攻撃宣言';
   if(entry.kind==='forceEnd') return '対象：現在の攻防連鎖全体';
@@ -1649,8 +1649,8 @@ function comResponsePlan(info){
   }else if(kind==='lastStand'){
     if(own.length!==1||enemy.length<2)return null;score=needsPower?108:45;
   }else if(kind==='removePower1'){
-    var activePowerZero=enemy.filter(function(x){return currentBattlePower(x)===0;});
-    target=strongestCharacter(activePowerZero)||strongestCharacter(enemyBoard.filter(function(x){return currentBattlePower(x)===0;}));
+    var activePowerOne=enemy.filter(function(x){return currentBattlePower(x)<=1;});
+    target=strongestCharacter(activePowerOne)||strongestCharacter(enemyBoard.filter(function(x){return currentBattlePower(x)<=1;}));
     if(!target)return null;payload.targetUid=target.uid;score=112;
   }else if(kind==='forceEnd'){
     score=ownTotal>enemyTotal?115:28;
@@ -1756,7 +1756,7 @@ function renderControls(){
     var actor=game.state==='standby'?playerByKey(game.standbyKey):game.state==='response'||game.state==='chain'?playerByKey(game.responseActorKey):game.state==='turnDraw'||game.state==='attackDeclare'?playerByKey(game.turnKey):null;
     html+='<div class="controlsText"><span class="modeBadge">COM同士の自動対戦</span></div>';
     html+='<div class="valueBox">'+esc(game.state==='matchOver'?'マッチ終了':game.state==='gameOver'?'勝利SE終了の1秒後に次のゲームへ':game.state==='coinToss'?'先攻後攻の抽選結果を表示中':actor?actor.name+'が思考中':'効果と攻撃結果を処理中')+'</div>';
-    if(game.state!=='matchOver')html+='<div class="controlsText">'+(game.autoPaused?'一時停止中':'3秒ごとに一手進みます。')+'</div>'+btn('toggle-auto',game.autoPaused?'再開':'一時停止',{},'primary');
+    if(game.state!=='matchOver')html+='<div class="controlsText">'+(game.autoPaused?'一時停止中':'3秒ごとに一手進みます。')+'</div>';
     controlsEl.innerHTML=html;
     return;
   }
@@ -2156,7 +2156,7 @@ function responseEffectControls(info){
     var removableTargets=opponent.battleArea.slice();
     return responseCharacterTargetControls(removableTargets,function(x){
       var currentPower=Math.max(0,x.level+(atk.mods[x.uid]||0));
-      return characterBoardChoiceLabel(x,'を指定（処理時の攻撃力が0なら除外／現在'+currentPower+'）');
+      return characterBoardChoiceLabel(x,'を指定（永続−1、処理時に攻撃力0なら撤退／現在'+currentPower+'）');
     },'選んだキャラを対象にして発動',removableTargets.length?'':'対象にできる相手キャラがいない状態で使用');
   }
   if(kind === 'lastStand'){
@@ -2516,7 +2516,7 @@ function finishResponsePlay(kind){
   choice().responseTargetUid = null;
   choice().effect.clear();
   if(kind === 'forceEnd'){ beginResolution(); return; }
-  if(hasChainCard(actor)&&!confirmHandsOff){
+  if(hasChainCard(actor)){
     game.state = 'chain';
     status(actor.name + 'は連続発動カードを使えます');
     render();
@@ -2716,12 +2716,16 @@ function applyQueuedEffect(entry){
   if(kind==='removePower1'){
     var targetOwner=op;
     var removedChar=findChar(targetOwner,payload.targetUid);
-    var removedPower=removedChar ? Math.max(0,removedChar.level+(atk.mods[removedChar.uid]||0)) : null;
-    if(!removedChar || removedPower!==0) return '対象にした相手キャラが効果処理時に攻撃力0ではないため不発';
-    var removedName=removedChar.name+'（効果処理時の攻撃力0）';
-    moveToExclusion(targetOwner,removedChar);
-    atk.attackerUids=atk.attackerUids.filter(function(id){return id!==removedChar.uid;});
-    return removedName+'を除外';
+    if(!removedChar) return '対象にした相手キャラが場にいないため不発';
+    var before=currentBattlePower(removedChar);
+    removedChar.level=Math.max(0,removedChar.level-1);
+    var after=currentBattlePower(removedChar);
+    if(after===0){
+      moveToRetreat(targetOwner,removedChar);
+      atk.attackerUids=atk.attackerUids.filter(function(id){return id!==removedChar.uid;});
+      return removedChar.name+'を'+before+'から0へ永続−1し、効果処理時に撤退';
+    }
+    return removedChar.name+'を'+before+'から'+after+'へ永続−1';
   }
   if(kind==='lockZone'){
     var lockSlot=Number(payload.lockSlot);
@@ -3134,8 +3138,9 @@ function beginSelectedMode(mode, firstKey, skipConfirm){
   recordHistory();
   startMatch(mode, firstKey);
 }
+var catalogOpen=false;
 function isDialogOpen(){
-  return !rulesOverlay.hidden || !settingsOverlay.hidden;
+  return catalogOpen || !rulesOverlay.hidden || !settingsOverlay.hidden;
 }
 function syncDialogState(){
   var anyOpen=isDialogOpen();
@@ -3287,12 +3292,29 @@ battleStageEl.addEventListener('keydown',function(e){
 });
 comStartBtn.addEventListener('click',function(){beginSelectedMode('com');});
 autoStartBtn.addEventListener('click',function(){beginSelectedMode('auto');});
+document.getElementById('autoPauseBtn').addEventListener('click',function(){
+  if(!game||game.mode!=='auto'||game.state==='matchOver')return;
+  game.autoPaused=!game.autoPaused;
+  if(game.autoPaused)cancelComTimer();
+  render();
+});
 
 undoBtn.addEventListener('click',undoOne);
 redoBtn.addEventListener('click',redoOne);
 
 
 window.DuelEngine=Object.freeze({
+  setCatalogOpen:function(value){catalogOpen=!!value;syncDialogState();},
+  cardCatalog:function(){
+    function item(c,count,side){return {type:c.type,title:cardDisplayName(c),effect:cardEffectText(c),count:count,side:side||'両デッキ'};}
+    var characters=A_CHAR_NAMES.map(function(name){return item({type:'character',name:name,level:1},3,'A側');}).concat(B_CHAR_NAMES.map(function(name){return item({type:'character',name:name,level:1},3,'B側');}));
+    var expansions=[['growth',3],['rapidGrowth',1],['summon',2],['summonShuffleDraw',3],['draw2discard2',3],['draw1',2],['defensePrep',2]].map(function(x){return item({type:'exp',kind:x[0]},x[1]);});
+    var traps=[['levelDown',2],['lockZone',1],['reviveFromRetreat',1],['removePower1',1],['skipAttack',1],['forceEnd',1],['splitAttack',2]].map(function(x){return item({type:'trap',kind:x[0],chain:x[0]==='forceEnd'},x[1]);});
+    var tactics=[['buff1',2],['debuff1',2],['redirect',1],['revive',1],['peek2',1],['drawTactic2',1],['buffAll1',1],['debuffAll1',1],['recycle',1],['negateTrap',1],['strategyShift',1],['supportDefense',1],['lastStand',1]].map(function(x){var o=item({type:'tactic',kind:x[0]},x[1]);if(x[0]==='buff1')o.effect+='（2枚中1枚は連続発動）';return o;});
+    A_CHAR_NAMES.forEach(function(name){tactics.push(item({type:'tactic',kind:'namedShift',targetName:name},1,'A側'));});
+    B_CHAR_NAMES.forEach(function(name){tactics.push(item({type:'tactic',kind:'namedShift',targetName:name},1,'B側'));});
+    return [{title:'キャラカード',cards:characters},{title:'展開カード',cards:expansions},{title:'罠カード',cards:traps},{title:'戦術カード',cards:tactics}];
+  },
   pileContents:function(side,suffix){
     if(!game||['own','opp'].indexOf(side)<0||['Retreat','Exclusion'].indexOf(suffix)<0)return null;
     var p=side==='own'?game.A:game.B,cards=suffix==='Retreat'?p.retreat:p.exclusion;
