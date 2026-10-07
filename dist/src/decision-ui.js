@@ -30,7 +30,7 @@ export function createDecisionUI(stage,controls){
   const pass=buttons.find(b=>['response-pass','attack-pass'].includes(b.dataset.action));
   const end=buttons.find(b=>b.dataset.action==='end-chain');
   function move(button,which,label,kind){if(!button)return;const description=button.textContent;button.setAttribute('aria-label',description);button.title=description;button.textContent=label.replace('キャンセル','キャン\nセル').replace('自動で選ぶ','自動で\n選ぶ').replace('攻撃宣言へ','攻撃\n宣言へ').replace('停止／再開','停止／\n再開');button.classList.add('deckOrb',kind);button.dataset.deck=which;if(kind==='deckConfirm')button.dataset.handoff='true';deck.append(button);}
-  const shortLabels={'discard-standby':'捨てる','auto-opening-tactics':'自動で選ぶ','confirm-reinforcement':'公開','hide-reinforcement':'裏向き','skip-tactic-draw':'攻撃宣言へ','draw-tactic':'ドロー','finish-standby':'終了','resolve-next-effect':'次へ','resolve-battle-result':'結果へ','acknowledge-peek':'確認','next-game':'次の試合','toggle-auto':'停止／再開'};
+  const shortLabels={'discard-standby':'捨てる','auto-opening-tactics':'自動で選ぶ','confirm-reinforcement':'公開','hide-reinforcement':'確認した','skip-tactic-draw':'攻撃宣言へ','draw-tactic':'ドロー','finish-standby':'終了','resolve-next-effect':'次へ','resolve-battle-result':'結果へ','acknowledge-peek':'確認','next-game':'次の試合','toggle-auto':'停止／再開'};
   const primary=buttons.find(b=>confirmations.has(b.dataset.action))||(!cancel?end:null);
   const automatic=buttons.find(b=>b.dataset.action==='auto-opening-tactics');
   move(primary,'MainDeck',shortLabels[primary?.dataset.action]||'決定','deckConfirm');

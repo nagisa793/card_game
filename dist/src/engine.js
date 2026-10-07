@@ -79,12 +79,12 @@ var TRAP_LABEL = {
 };
 var TRAP_NAME = {
   levelDown:'衰弱の刻印',
-  lockZone:'作戦封鎖',
+  lockZone:'侵された大地',
   reviveFromRetreat:'復活の狼煙',
-  removePower1:'弱兵排除',
-  skipAttack:'判官贔屓',
-  forceEnd:'強制終結',
-  splitAttack:'分断工作'
+  removePower1:'消えない裂傷',
+  skipAttack:'被食者の復讐',
+  forceEnd:'神の終止符',
+  splitAttack:'引裂かれる想い'
 };
 var TACTIC_LABEL = {
   buff1:'戦術：この攻防ステップ中、指定キャラ+1',
@@ -126,13 +126,13 @@ var EXP_LABEL = {
   defensePrep:'展開：デッキ上3枚から罠1枚を作戦エリアに伏せる'
 };
 var EXP_NAME = {
-  growth:'成長',
-  rapidGrowth:'急成長',
-  summon:'緊急招集',
-  summonShuffleDraw:'増援到着',
-  draw2discard2:'手札交換',
-  draw1:'補給',
-  defensePrep:'防衛準備'
+  growth:'進化Lv.1',
+  rapidGrowth:'進化Lv.2',
+  summon:'援軍',
+  summonShuffleDraw:'援軍指名',
+  draw2discard2:'手札入替',
+  draw1:'手札交換',
+  defensePrep:'地雷探知機'
 };
 var LIMITED_KINDS = {
   lockZone:true, reviveFromRetreat:true, removePower1:true, skipAttack:true, forceEnd:true, rapidGrowth:true,
@@ -799,13 +799,13 @@ function selectionPanelHtml(){
       var offer=c.reinforcement;
       if(offer&&offer.stage==='pick'){
         if(p===game.B)return null;
-        title='増援到着｜異なるキャラを3体選択（'+offer.ids.length+'/3）';
+        title='援軍指名｜異なるキャラを3体選択（'+offer.ids.length+'/3）';
         var names=new Set();cards=p.mainDeck.filter(function(x){if(x.type!=='character'||names.has(x.name))return false;names.add(x.name);return true;});
         action='pick-reinforcement';
       }else if(offer&&offer.stage==='reveal'){
-        title='増援到着｜相手に見せる3体';cards=offer.ids.map(function(id){return findCard(p.mainDeck,id);}).filter(Boolean);action='show-reinforcement';
+        title='援軍指名｜相手に見せる3体';cards=offer.ids.map(function(id){return findCard(p.mainDeck,id);}).filter(Boolean);action='show-reinforcement';
       }else if(offer&&offer.stage==='choose'){
-        title='増援到着｜裏向きの3枚から相手が1枚選択';
+        title='援軍指名｜裏向きの3枚から相手が1枚選択';
         var backs='<div class="handRow selectionCardGrid">';
         offer.ids.forEach(function(id,i){backs+='<button type="button" class="cardBack selectionCard reinforcementBack" data-action="choose-reinforcement" data-index="'+i+'" aria-label="裏向きのカード'+(i+1)+'を選ぶ">非公開</button>';});
         return {title:title,html:backs+'</div>'};
@@ -1318,7 +1318,6 @@ function finishStandby(){
   var p = playerByKey(game.standbyKey);
   if(p.mainHand.length || p.tempPlayed.some(function(x){return x.type==='exp';})) return;
   p.standbyComplete=true;
-  if(game.A.standbyComplete&&game.B.standbyComplete&&!game.battlePhaseAnnounced){game.battlePhaseAnnounced=true;window.dispatchEvent(new CustomEvent('duel:battle-phase'));}
   log(p.name + '：スタンバイフェイズ終了');
   if(game.mode==='auto'){
     p.standbyComplete=true;
@@ -1733,6 +1732,10 @@ function comTieChoiceStep(){
 }
 function beginTurn(p){
   if(checkEnd()) return;
+  if(game.A.standbyComplete&&game.B.standbyComplete&&(game.mode==='auto'||game.humanTacticsReady)&&!game.battlePhaseAnnounced){
+    game.battlePhaseAnnounced=true;
+    window.dispatchEvent(new CustomEvent('duel:battle-phase'));
+  }
   game.turnCount++;
   game.state = 'turnDraw';
   game.turnKey = playerKey(p);
@@ -1883,7 +1886,7 @@ function reinforcementControls(){
   var p=playerByKey(game.standbyKey),offer=choice().reinforcement;
   if(!offer)return '';
   if(offer.stage==='pick')return '<div class="controlsText">デッキから異なるキャラを3体選んでください。</div>'+btn('confirm-reinforcement','3体を相手に見せる',{},'primary',offer.ids.length!==3);
-  if(offer.stage==='reveal')return '<div class="controlsText">'+esc(p.name)+'が選んだ3体を公開しています。確認後、裏向きにして相手が選びます。</div>'+(game.mode==='com'&&game.standbyKey==='B'?btn('hide-reinforcement','裏向きにして選ぶ',{},'primary'):'');
+  if(offer.stage==='reveal')return '<div class="controlsText">'+esc(p.name)+'が選んだ3体を公開しています。確認後、裏向きにして相手が選びます。</div>'+(game.mode==='com'&&game.standbyKey==='B'?btn('hide-reinforcement','確認した',{},'primary'):'');
   if(offer.stage==='choose')return '<div class="controlsText">'+(game.mode==='com'&&game.standbyKey==='B'?'裏向きの3枚から召喚する1枚を選んでください。':'相手が裏向きの3枚から選択中です。')+'</div>';
   return '';
 }
@@ -2285,7 +2288,7 @@ function activateExpansion(p,c,slot,deferResolution){
   log(p.name+'：展開カード「'+cardDisplayName(played)+'」を作戦エリア'+(slot+1)+'番枠で発動');
   if(deferResolution)return;
   if(played.kind==='draw1'){resolveDrawOne(p,played);return;}
-  if(played.kind==='draw2discard2'&&p.mainHand.length<2){log(p.name+'：手札が2枚未満のため「手札交換」を処理できない');consumeStandbyCard(p,played);return;}
+  if(played.kind==='draw2discard2'&&p.mainHand.length<2){log(p.name+'：手札が2枚未満のため「手札入替」を処理できない');consumeStandbyCard(p,played);return;}
   if(played.kind==='summonShuffleDraw'){beginReinforcement(p,played);return;}
   if(played.kind==='summon'&&(!p.mainDeck.some(function(x){return x.type==='character';})||!openBattleSlotIndexes(p,false).length)){log(p.name+'：特殊召喚できるキャラまたは空き枠がない');finishExpansionAfterSummon(p,played);return;}
   if(played.kind==='growth'&&!p.battleArea.some(function(x){return x.level<3;})){log(p.name+'：強化できるキャラがいない');consumeStandbyCard(p,played);return;}
@@ -2305,7 +2308,7 @@ function useExpansionTarget(p,c,uid){
 function beginReinforcement(p,c){
   var names=new Set(p.mainDeck.filter(function(x){return x.type==='character';}).map(function(x){return x.name;}));
   if(names.size<3||!openBattleSlotIndexes(p,false).length){
-    log(p.name+'：「増援到着」は異なるキャラ3体または召喚先を用意できず、効果が無効');
+    log(p.name+'：「援軍指名」は異なるキャラ3体または召喚先を用意できず、効果が無効');
     consumeStandbyCard(p,c);return;
   }
   choice().reinforcement={stage:'pick',ids:[]};
@@ -2317,7 +2320,7 @@ function revealReinforcement(p){
   var selected=offer.ids.map(function(id){return findCard(p.mainDeck,id);});
   if(selected.some(function(x){return !x||x.type!=='character';})||new Set(selected.map(function(x){return x.name;})).size!==3)return;
   offer.stage='reveal';
-  log(p.name+'：「増援到着」で'+selected.map(function(x){return x.name;}).join('／')+'を相手に公開');
+  log(p.name+'：「援軍指名」で'+selected.map(function(x){return x.name;}).join('／')+'を相手に公開');
 }
 function chooseReinforcement(index){
   var offer=choice().reinforcement,p=playerByKey(game.standbyKey);

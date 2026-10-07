@@ -4,7 +4,7 @@ import * as T from 'three';
 import {RoundedBoxGeometry} from '../vendor/addons/geometries/RoundedBoxGeometry.js';
 import {mergeGeometries} from '../vendor/addons/utils/BufferGeometryUtils.js';
 import {RoomEnvironment} from '../vendor/addons/environments/RoomEnvironment.js';
-import {palette,cardTexture,waitForCardBack} from './materials.js?v=78';
+import {palette,cardTexture,waitForCardBack} from './materials.js?v=79';
 
 export class Arena {
  constructor(canvas,labels){
