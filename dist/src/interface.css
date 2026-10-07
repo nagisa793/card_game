@@ -358,7 +358,8 @@ body.gameStarting #ownHand,body.gameStarting #oppHand,body.gameStarting #ownSele
 /* Independent selection surface in the left scenery space. */
 #selectionPanel{left:9px;top:9%;bottom:65px;width:23%;max-width:none;}
 #selectionPanel .selectionCardGrid{grid-template-columns:repeat(4,minmax(0,1fr));align-content:start;}
-#battleStage.selectingCards #chainHistoryShell{visibility:hidden;pointer-events:none;}
+#battleStage.selectingCards #activeFlowRail{visibility:hidden;pointer-events:none;}
+.battleLayout:has(#selectionPanel:not([hidden])) #chainHistoryShell{visibility:hidden;pointer-events:none;}
 @media(max-width:760px){#selectionPanel{left:4px;top:12%;bottom:auto;width:38%;height:65%;}#selectionPanel .selectionCardGrid{grid-template-columns:repeat(3,minmax(0,1fr));}}
 
 /* Selection survives printed card artwork and uses a distinct placement color. */
@@ -381,7 +382,7 @@ body.gameStarting #ownHand,body.gameStarting #oppHand,body.gameStarting #ownSele
 #pilePanel{position:absolute;z-index:23;left:9px;right:auto;top:10%;bottom:90px;width:23%;padding:10px;border:1px solid #9bb9c3;background:#0b1b29f2;border-radius:8px;overflow-y:auto;color:#eee;}
 #pilePanel[hidden]{display:none!important;}.pileCardGrid{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-top:9px;}
 #pilePanel .card{width:100%;min-width:0;height:auto;aspect-ratio:384/538;}
-#battleStage:has(#pilePanel:not([hidden])) #chainHistoryShell{visibility:hidden;pointer-events:none;}
+.battleLayout:has(#pilePanel:not([hidden])) #chainHistoryShell{visibility:hidden;pointer-events:none;}
 #standbyTransitionOverlay{position:fixed;inset:0;z-index:1100;display:grid;place-items:center;background:#000;color:white;font-size:clamp(24px,5vw,68px);letter-spacing:.08em;font-weight:800;pointer-events:auto;}
 .chainHistoryPanel .chainItem.player-A{background-color:#173a52;border-color:#65b5ef;}
 .chainHistoryPanel .chainItem.player-B{background-color:#512734;border-color:#f38b9c;}
