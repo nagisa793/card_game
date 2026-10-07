@@ -117,7 +117,8 @@ effect('negateTrap',g=>g.attack.chainHistory=[{src:'trap',actorKey:'A',status:'p
 effect('splitAttack',g=>g.attack.attackerUids=[1001,1002,1003],g=>{assert.equal(g.attack.attackerUids.length,2);assert.equal(g.A.battleArea.length,3);},{targetUid:1002});
 effect('supportDefense',null,g=>{assert.equal(g.attack.mods[2002],-1);assert.equal(g.attack.mods[2001],1);},{targetUid:2002,recipientUid:2001});
 effect('lastStand',g=>g.attack.attackerUids=[1001,1002],g=>assert.equal(g.attack.mods[2001],2));
-effect('removePower1',null,g=>assert.equal(g.A.exclusion[0].uid,1002),{targetUid:1002});
+effect('removePower1',g=>{g.attack.mods[1002]=-1;},g=>assert.equal(g.A.exclusion[0].uid,1002),{targetUid:1002});
+effect('removePower1',null,g=>assert.equal(g.A.exclusion.length,0),{targetUid:1002});
 effect('lockZone',null,g=>assert.equal(g.A.pendingLockedSlotIndexes[0],4),{lockSlot:4});
 effect('skipAttack',g=>{g.B.battleArea.pop();},g=>assert(g.A.skipNextAttack));
 effect('skipAttack',null,g=>assert.equal(g.A.skipNextAttack,false));
@@ -167,12 +168,13 @@ for(const weakened of [false,true]){
  let resultText='';const onResult=event=>{if(event.detail.kind==='result')resultText=event.detail.text;};w.addEventListener('duel:visual',onResult);
  t.resolveAttack();w.removeEventListener('duel:visual',onResult);
  assert.equal(g.B.battleArea.length,0,'defending Lv2 retreats after combined attack');
- assert.equal(g.A.battleArea.some(x=>x.uid===1001),!weakened,'attacking Lv1 survives unless its power is zero');
+ assert(g.A.battleArea.some(x=>x.uid===1001),'temporary Lv0 returns to base Lv1 after the battle');
  assert(g.A.battleArea.some(x=>x.uid===1002),'attacking Lv2 survives');
- if(weakened)assert(resultText.includes('攻撃力0だったため')&&resultText.includes('unit1001'));
+ if(weakened)assert(!resultText.includes('元Lvが永続的に0'));
 }
+{const g=scenario();g.state='resolving';g.A.battleArea=[character(1001,1,0),character(1002,3,1)];g.B.battleArea=[character(2001,2,0)];g.attack.attackerUids=[1001,1002];g.attack.allAttackerUids=[1001,1002];g.attack.mods[1001]=-1;g.A.battleArea[0].level=0;t.resolveAttack();assert(!g.A.battleArea.some(x=>x.uid===1001),'permanent base Lv0 retreats after result');}
 let battles=0;
-for(const n of [1,2,3])for(let a=1;a<=3;a++)for(let b=1;b<=3;b++)for(const mod of [-1,0,1]){const g=scenario();g.state='resolving';g.A.battleArea=Array.from({length:n},(_,i)=>character(1001+i,a,i));g.B.battleArea=[character(2001,b,0),character(2010,3,4)];g.attack.attackerUids=g.A.battleArea.map(x=>x.uid);g.attack.allAttackerUids=g.attack.attackerUids.slice();g.attack.mods[1001]=mod;const sum=n*a+mod;const equality=sum===b;t.resolveAttack();if(equality&&n>1){assert.equal(g.state,'tieChoice');t.resolveTieVictim(1001);}if(sum>b)assert(!g.B.battleArea.some(x=>x.uid===2001));if(sum<b)assert(!g.A.battleArea.some(x=>x.uid>=1001&&x.uid<1001+n));if(equality){assert.equal(g.B.battleArea.find(x=>x.uid===2001)?.level||0,b-1);if(n===1)assert.equal(g.A.battleArea.find(x=>x.uid===1001)?.level||0,a-1+mod<=0?0:a-1,`single tie a=${a}, b=${b}, mod=${mod}`);}assert.equal(g.attack,null);battles++;}
+for(const n of [1,2,3])for(let a=1;a<=3;a++)for(let b=1;b<=3;b++)for(const mod of [-1,0,1]){const g=scenario();g.state='resolving';g.A.battleArea=Array.from({length:n},(_,i)=>character(1001+i,a,i));g.B.battleArea=[character(2001,b,0),character(2010,3,4)];g.attack.attackerUids=g.A.battleArea.map(x=>x.uid);g.attack.allAttackerUids=g.attack.attackerUids.slice();g.attack.mods[1001]=mod;const sum=n*a+mod;const equality=sum===b;t.resolveAttack();if(equality&&n>1){assert.equal(g.state,'tieChoice');t.resolveTieVictim(1001);}if(sum>b)assert(!g.B.battleArea.some(x=>x.uid===2001));if(sum<b)assert(!g.A.battleArea.some(x=>x.uid>=1001&&x.uid<1001+n));if(equality){assert.equal(g.B.battleArea.find(x=>x.uid===2001)?.level||0,b-1);if(n===1)assert.equal(g.A.battleArea.find(x=>x.uid===1001)?.level||0,a-1,`single tie a=${a}, b=${b}, mod=${mod}`);}assert.equal(g.attack,null);battles++;}
 // Reverse resolution, negation, delayed cleanup and locked slots.
 {const g=scenario();g.state='resolving';g.attack.chainHistory=[Object.assign(entry('levelDown','A',{targetUid:2001}),{src:'trap'}),entry('negateTrap','B',{targetIndex:0})];g.attack.resolutionIndex=1;t.resolveNextEffect();assert(g.attack.chainHistory[0].negated);assert.equal(g.attack.resolutionIndex,0);t.resolveNextEffect();assert.equal(g.B.battleArea[0].level,2);assert.equal(g.attack.resolutionIndex,-1);targeted++;}
 {const g=scenario();g.state='resolving';g.B.battleArea[0].level=1;g.attack.chainHistory=[entry('buff1','B',{targetUid:2001}),entry('debuff1','A',{targetUid:2001})];g.attack.resolutionIndex=1;t.resolveNextEffect();assert(g.B.battleArea.some(x=>x.uid===2001),'zero power must not retreat mid-chain');t.resolveNextEffect();assert.equal(g.attack.mods[2001],0);targeted++;}

@@ -85,7 +85,7 @@
           <li>表向きの戦術・罠カードは全効果の処理が終わるまで作戦エリアに残り、その後まとめて撤退エリアへ移ります。</li>
           <li>確定した効果は<b>最後に発動したカードから最初のカードへ</b>逆順で処理します。</li>
         </ul>
-        <p class="rulesNote">攻防連鎖の途中で攻撃力が0になっても、すぐには撤退しません。すべての効果と攻撃結果を処理した時点で0なら撤退します。</p>
+        <p class="rulesNote">一時的な効果でLv0になっても、それだけでは撤退しません。攻撃結果の処理後、元Lvが永続的に0のキャラは撤退します。「消えない裂傷」は効果処理時にLv0の対象を除外します。</p>
       </section>
 
       <section class="rulesSection">
@@ -253,7 +253,7 @@
 
 
 <script type="importmap">{"imports":{"three":"./vendor/three.module.js"}}</script>
-<script src="./src/engine.js?v=80"></script>
-<script type="module" src="./src/boot.js?v=80"></script>
+<script src="./src/engine.js?v=81"></script>
+<script type="module" src="./src/boot.js?v=81"></script>
 </body>
 </html>
