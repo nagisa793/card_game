@@ -798,7 +798,7 @@ function selectionPanelHtml(){
     if(active&&active.kind==='summonShuffleDraw'){
       var offer=c.reinforcement;
       if(offer&&offer.stage==='pick'){
-        if(p===game.B)return null;
+        if(game.mode==='auto'||p===game.B)return null;
         title='援軍指名｜異なるキャラを3体選択（'+offer.ids.length+'/3）';
         var names=new Set();cards=p.mainDeck.filter(function(x){if(x.type!=='character'||names.has(x.name))return false;names.add(x.name);return true;});
         action='pick-reinforcement';
@@ -811,8 +811,10 @@ function selectionPanelHtml(){
         return {title:title,html:backs+'</div>'};
       }
     }else if(active&&active.kind==='summon'){
+      if(game.mode==='auto'||p===game.B)return null;
       title='メインデッキ｜召喚するキャラ';cards=p.mainDeck.filter(function(x){return x.type==='character';});action='choose-special-character';chosen=c.summonDeckCid;
     }else if(active&&active.kind==='defensePrep'){
+      if(game.mode==='auto'||p===game.B)return null;
       title='メインデッキ｜上から3枚を確認';cards=p.mainDeck.slice(0,3);action='resolve-defense-prep';disabled=tacticSlotsOpen(p)<=0;
       if(!cards.some(function(x){return x.type==='trap';}))empty='罠カードがありません。操作欄から確認を終えてください。';
     }
@@ -1404,7 +1406,9 @@ function queueComIfNeeded(){
     recordHistory();
     runComStep();
     render();
-  },game.state==='gameOver'&&game.mode==='auto'?Math.max(0,victoryDelayUntil-Date.now()):COM_DELAY);
+  },game.state==='gameOver'&&game.mode==='auto'
+    ? game.isDraw ? COM_DELAY : Math.max(0,victoryDelayUntil-Date.now())
+    : COM_DELAY);
 }
 function runComStep(){
   if(game.state==='coinToss'){
@@ -1755,7 +1759,7 @@ function renderControls(){
   if(game.mode==='auto'){
     var actor=game.state==='standby'?playerByKey(game.standbyKey):game.state==='response'||game.state==='chain'?playerByKey(game.responseActorKey):game.state==='turnDraw'||game.state==='attackDeclare'?playerByKey(game.turnKey):null;
     html+='<div class="controlsText"><span class="modeBadge">COM同士の自動対戦</span></div>';
-    html+='<div class="valueBox">'+esc(game.state==='matchOver'?'マッチ終了':game.state==='gameOver'?'勝利SE終了の1秒後に次のゲームへ':game.state==='coinToss'?'先攻後攻の抽選結果を表示中':actor?actor.name+'が思考中':'効果と攻撃結果を処理中')+'</div>';
+    html+='<div class="valueBox">'+esc(game.state==='matchOver'?'マッチ終了':game.state==='gameOver'?(game.isDraw?'完全同点。3秒後に再試合へ':'勝利SE終了の1秒後に次のゲームへ'):game.state==='coinToss'?'先攻後攻の抽選結果を表示中':actor?actor.name+'が思考中':'効果と攻撃結果を処理中')+'</div>';
     if(game.state!=='matchOver')html+='<div class="controlsText">'+(game.autoPaused?'一時停止中':'3秒ごとに一手進みます。')+'</div>';
     controlsEl.innerHTML=html;
     return;

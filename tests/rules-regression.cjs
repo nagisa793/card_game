@@ -42,6 +42,22 @@ for(const mode of ['com','auto']){
  t.comStandbyStep();assert.equal(g.B.tempPlayed.length,0);assert(g.B.retreat.includes(expansion));assert.equal(g.B.mainDeck.length,before-1);
 }
 console.log('PASS COM: dedicated tactic targets attack participants; expansions visibly occupy a zone in both modes');
+for(const [mode,key] of [['com','B'],['auto','A'],['auto','B']])for(const kind of ['summon','defensePrep']){
+ const g=scenario();g.mode=mode;g.state='standby';g.standbyKey=key;
+ const active=t.card('exp',{kind,zoneSlot:0});g[key].tempPlayed=[active];
+ t.choice().standbyCard=active.cid;t.choice().expansionActivated=true;
+ paint();assert(!d.querySelector('#selectionPanelTitle').textContent.includes('メインデッキ'),`COM ${mode}/${key}/${kind} should not reveal its deck`);
+ if(mode==='auto')assert(d.querySelector('#selectionPanel').hidden,`spectator ${key}/${kind} should not show a selection panel`);
+}
+{const g=scenario();g.state='standby';g.standbyKey='A';g.humanTacticsReady=true;const active=t.card('exp',{kind:'summon',zoneSlot:0});
+ g.A.tempPlayed=[active];t.choice().standbyCard=active.cid;t.choice().expansionActivated=true;
+ paint();assert(!d.querySelector('#selectionPanel').hidden,'manual summon still shows own deck candidates');}
+console.log('PASS UI: automatic deck searches stay private; manual search keeps its selection panel');
+{const g=scenario();g.mode='auto';g.state='gameOver';g.isDraw=true;g.autoPaused=true;
+ paint();assert(d.querySelector('#controls').textContent.includes('完全同点。3秒後に再試合へ'));
+ assert(!d.querySelector('#controls').textContent.includes('勝利SE終了'));
+}
+console.log('PASS UI: drawn game announces a rematch without a victory sound');
 // Negate Trap selects the pending opponent trap directly on the board.
 for(const [mode,actorKey] of [['com','A']]){
  const g=scenario();g.mode=mode;g.state='chain';g.responseActorKey=actorKey;const opponent=actorKey==='A'?'B':'A';
