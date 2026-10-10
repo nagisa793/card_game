@@ -652,6 +652,7 @@ function selectedTacticHandHtml(cards){
 function openingTacticSelectionActive(){
   return !!(game&&game.mode==='com'&&!game.humanTacticsReady&&(game.state==='awaitTacticSelection'||(['standby','mulliganConfirm'].indexOf(game.state)>=0&&game.standbyKey==='B')));
 }
+function openingTacticCount(p){return p.isFirst?5:7;}
 function openingTacticHandHtml(){
   if(!openingTacticSelectionActive())return '';
   return tacticsInDisplayOrder(game.A.tacticDeck.filter(function(c){return game.humanTacticSelection.has(c.cid);})).map(function(c){
@@ -791,8 +792,8 @@ function selectionPanelHtml(){
   var title='',cards=[],action='',chosen=null,disabled=false,empty='';
   var reinforcementChoice=game.state==='standby'&&choice().reinforcement&&game.standbyKey==='B'&&['reveal','choose'].indexOf(choice().reinforcement.stage)>=0;
   if(openingTacticSelectionActive()&&!reinforcementChoice){
-    var picked=game.humanTacticSelection;title='戦術デッキ｜手札を7枚選択（'+picked.size+' / 7）';
-    cards=tacticsInDisplayOrder(game.A.tacticDeck.filter(function(c){return !picked.has(c.cid);}));action='toggle-opening-tactic';disabled=picked.size>=7;
+    var picked=game.humanTacticSelection,limit=openingTacticCount(game.A);title='戦術デッキ｜手札を'+limit+'枚選択（'+picked.size+' / '+limit+'）';
+    cards=tacticsInDisplayOrder(game.A.tacticDeck.filter(function(c){return !picked.has(c.cid);}));action='toggle-opening-tactic';disabled=picked.size>=limit;
   }else if(game.state==='standby'){
     var p=playerByKey(game.standbyKey),c=choice(),active=c.expansionActivated?findCard(p.tempPlayed,c.standbyCard):null;
     if(active&&active.kind==='summonShuffleDraw'){
@@ -1224,10 +1225,8 @@ function beginStandbyNow(p, title){
     p.openingMainDealt=true;
     log(p.name + '：メインデッキから7枚ドロー');
   }
-  if(game.mode==='com' && p===game.B) prepareComOpeningTactics();
-  if(game.mode==='auto' && !p.openingTacticsReady) drawOpeningTactics(p);
   phase(title);
-  status(game.mode==='auto' ? p.name+'が3秒ごとに盤面を構築します' : game.mode==='com' && p===game.B ? 'COMが3秒ごとに盤面を構築します。あなたは戦術カード7枚を選んでください' : p.name + 'のスタンバイを手動で操作してください');
+  status(game.mode==='auto' ? p.name+'が3秒ごとに盤面を構築します' : game.mode==='com' && p===game.B ? 'COMが3秒ごとに盤面を構築します。あなたは戦術カード'+openingTacticCount(game.A)+'枚を選んでください' : p.name + 'のスタンバイを手動で操作してください');
   log('■ ' + title,'phaseLine');
   clearChoice();
   if(requireOpeningHandConfirmation(p)) return;
@@ -1260,7 +1259,11 @@ function confirmMulligan(){
   render();
 }
 function drawOpeningTactics(p){
-  var likelyCharacters=p.battleArea.concat(p.mainHand.filter(function(c){return c.type==='character';}));
+  // In COM spectator mode, the second player selects before seeing their own opening hand.
+  // Both players can base this choice on the battle areas already visible to them.
+  var publicBoardOnly=game.mode==='auto'||(game.mode==='com'&&p===game.B);
+  var likelyCharacters=p.battleArea.concat(publicBoardOnly?[]:p.mainHand.filter(function(c){return c.type==='character';}));
+  var visibleOpponent=publicBoardOnly?other(p).battleArea:[];
   var named=new Set(likelyCharacters.map(function(c){return c.name;}));
   var priority={buff1:110,debuff1:108,buffAll1:98,debuffAll1:97,negateTrap:95,supportDefense:86,redirect:83,drawTactic2:78,revive:70,lastStand:65,strategyShift:62,recycle:50,peek2:35};
   var ranked=p.tacticDeck.slice().sort(function(a,b){
@@ -1270,46 +1273,53 @@ function drawOpeningTactics(p){
       if(c.kind==='supportDefense'&&likelyCharacters.length<2)score=45;
       if(c.kind==='lastStand'&&likelyCharacters.length===1)score=90;
       if(c.kind==='revive'&&!p.retreat.length)score=55;
+      if(publicBoardOnly){
+        if(c.kind==='debuffAll1'&&visibleOpponent.length>=2)score+=6;
+        if(c.kind==='debuff1'&&visibleOpponent.length)score+=4;
+        if(c.kind==='redirect'&&visibleOpponent.length>=2)score+=4;
+        if(c.kind==='buffAll1'&&likelyCharacters.length>=2)score+=5;
+      }
       if(c.chain)score+=9;
       return score;
     }
     return value(b)-value(a);
   });
-  p.tacticHand=ranked.slice(0,7);
+  p.tacticHand=ranked.slice(0,openingTacticCount(p));
   var selected=new Set(p.tacticHand.map(function(c){return c.cid;}));
   p.tacticDrawPool=shuffle(p.tacticDeck.filter(function(c){return !selected.has(c.cid);}));
   p.tacticDeck=[];
   p.openingTacticsReady=true;
   p.tacticSelected = p.standbyComplete;
-  log(p.name + '：戦術デッキから最初の手札を7枚ドロー');
+  log(p.name + '：戦術デッキから最初の手札を'+openingTacticCount(p)+'枚選択');
 }
 function prepareComOpeningTactics(){
   if(game.B.openingTacticsReady) return;
   drawOpeningTactics(game.B);
-  log('COM：戦術手札7枚を非公開で準備');
+  log('COM：戦術手札'+openingTacticCount(game.B)+'枚を非公開で準備');
 }
 function finishComStandby(p){
   p.standbyComplete=true;
   p.tacticSelected=p.openingTacticsReady;
-  if(p===game.B){prepareComOpeningTactics();p.tacticSelected=true;}
   var first=playerByKey(game.firstKey);
   if(p===first){
     if(p===game.B && !game.humanTacticsReady){
       game.state='awaitTacticSelection';
       game.pendingSetupAction='beginSecond';
       phase('戦術手札の選択待ち');
-      status('戦術デッキから最初の手札7枚を選んでください');
+      status('戦術デッキから最初の手札'+openingTacticCount(game.A)+'枚を選んでください');
       render();
       return;
     }
+    if(first===game.A)prepareComOpeningTactics();
     beginStandby(other(first),'後攻スタンバイフェイズ（'+other(first).name+'が盤面構築）');
     return;
   }
+  if(first===game.B)prepareComOpeningTactics();
   if(!game.humanTacticsReady){
     game.state='awaitTacticSelection';
     game.pendingSetupAction='beginTurns';
     phase('戦術手札の選択待ち');
-    status('戦術デッキから最初の手札7枚を選んでください');
+    status('戦術デッキから最初の手札'+openingTacticCount(game.A)+'枚を選んでください');
     render();
     return;
   }
@@ -1322,11 +1332,15 @@ function finishStandby(){
   p.standbyComplete=true;
   log(p.name + '：スタンバイフェイズ終了');
   if(game.mode==='auto'){
-    p.standbyComplete=true;
-    p.tacticSelected=true;
     var autoFirst=playerByKey(game.firstKey);
-    if(p===autoFirst) beginStandby(other(p),'後攻スタンバイフェイズ（'+other(p).name+'が盤面構築）');
-    else beginTurn(autoFirst);
+    if(p===autoFirst){
+      drawOpeningTactics(other(p));
+      beginStandby(other(p),'後攻スタンバイフェイズ（'+other(p).name+'が盤面構築）');
+    }else{
+      p.tacticSelected=true;
+      drawOpeningTactics(autoFirst);
+      beginTurn(autoFirst);
+    }
     return;
   }
   if(game.mode==='com'){finishComStandby(p);return;}
@@ -1344,10 +1358,11 @@ function finishStandby(){
   }
 }
 function completeHumanTacticSelection(automatic){
-  if(game.mode!=='com' || game.humanTacticsReady || game.humanTacticSelection.size!==7) return;
+  var limit=openingTacticCount(game.A);
+  if(game.mode!=='com' || game.humanTacticsReady || game.humanTacticSelection.size!==limit) return;
   var selectedIds=game.humanTacticSelection;
   var selected=game.A.tacticDeck.filter(function(x){return selectedIds.has(x.cid);});
-  if(selected.length!==7) return;
+  if(selected.length!==limit) return;
   var remaining=game.A.tacticDeck.filter(function(x){return !selectedIds.has(x.cid);});
   game.A.tacticHand=selected;
   game.A.tacticDrawPool=shuffle(remaining);
@@ -1355,7 +1370,7 @@ function completeHumanTacticSelection(automatic){
   game.A.openingTacticsReady=true;
   game.A.tacticSelected=game.A.standbyComplete;
   game.humanTacticsReady=true;
-  log(automatic?'あなた：戦術デッキから最初の戦術手札7枚を自動で選び、残りをシャッフル':'あなた：選んだ7枚を最初の戦術手札にし、残りをシャッフル');
+  log(automatic?'あなた：戦術デッキから最初の戦術手札'+limit+'枚を自動で選び、残りをシャッフル':'あなた：選んだ'+limit+'枚を最初の戦術手札にし、残りをシャッフル');
   if(game.state==='awaitTacticSelection'){
     var next=game.pendingSetupAction;
     game.pendingSetupAction=null;
@@ -1370,13 +1385,14 @@ function completeHumanTacticSelection(automatic){
       return;
     }
   }
-  status(automatic?'戦術手札7枚を自動で選びました。COMの盤面構築を確認してください':'戦術手札7枚を選択しました。COMの盤面構築を確認してください');
+  status(automatic?'戦術手札'+limit+'枚を自動で選びました。COMの盤面構築を確認してください':'戦術手札'+limit+'枚を選択しました。COMの盤面構築を確認してください');
 }
 function autoSelectOpeningTactics(){
-  if(game.mode!=='com' || game.humanTacticsReady || game.A.tacticDeck.length<7) return;
-  var selected=shuffle(game.A.tacticDeck.slice()).slice(0,7);
+  var limit=openingTacticCount(game.A);
+  if(game.mode!=='com' || game.humanTacticsReady || game.A.tacticDeck.length<limit) return;
+  var selected=shuffle(game.A.tacticDeck.slice()).slice(0,limit);
   game.humanTacticSelection=new Set(selected.map(function(x){return x.cid;}));
-  status('自動で選んだ7枚を手札に表示しました。確認して確定してください');
+  status('自動で選んだ'+limit+'枚を手札に表示しました。確認して確定してください');
 }
 function comActionPending(){
   if(!game || (game.mode!=='com' && game.mode!=='auto')) return false;
@@ -1804,14 +1820,15 @@ function coinTossControls(){
     '<div class="controlsText">3秒後にスタンバイフェイズを開始します。</div>';
 }
 function openingTacticSelectionControls(){
+  var limit=openingTacticCount(game.A);
   if(game.humanTacticsReady){
-    return '<div class="openingSelect"><div class="controlsText"><b>戦術手札7枚は選択済みです。</b></div><div class="controlsText">COMの盤面構築が終わるまでお待ちください。</div></div>';
+    return '<div class="openingSelect"><div class="controlsText"><b>戦術手札'+limit+'枚は選択済みです。</b></div><div class="controlsText">COMの盤面構築が終わるまでお待ちください。</div></div>';
   }
   var selected=game.humanTacticSelection;
-  var html='<div class="openingSelect"><div class="controlsText"><b>あなたの最初の戦術手札を選択</b>　選択済み：'+selected.size+' / 7枚</div>';
-  html+='<div class="activeDecision"><div class="controlsText">7枚を選んで確定してください。自動選択した7枚も手札で確認・変更できます。</div><div class="actionDock">';
-  html+=btn('auto-opening-tactics','自動で7枚選ぶ',{},'primary');
-  html+=btn('confirm-opening-tactics','選んだ7枚で確定',{},'primary',selected.size!==7)+'</div></div>';
+  var html='<div class="openingSelect"><div class="controlsText"><b>あなたの最初の戦術手札を選択</b>　選択済み：'+selected.size+' / '+limit+'枚</div>';
+  html+='<div class="activeDecision"><div class="controlsText">'+limit+'枚を選んで確定してください。自動選択した'+limit+'枚も手札で確認・変更できます。</div><div class="actionDock">';
+  html+=btn('auto-opening-tactics','自動で'+limit+'枚選ぶ',{},'primary');
+  html+=btn('confirm-opening-tactics','選んだ'+limit+'枚で確定',{},'primary',selected.size!==limit)+'</div></div>';
   html+='<div class="controlsText">左側に並んだカードを選ぶと手札へ移ります。選んだカードは手札を押すと戻せます。</div></div>';
   return html;
 }
@@ -3055,7 +3072,7 @@ document.addEventListener('click',function(e){
   window.dispatchEvent(new CustomEvent('duel:action',{detail:{action:a}}));
   if(a==='toggle-opening-tactic'){
     if(game.humanTacticSelection.has(cid))game.humanTacticSelection.delete(cid);
-    else if(game.humanTacticSelection.size<7)game.humanTacticSelection.add(cid);
+    else if(game.humanTacticSelection.size<openingTacticCount(game.A))game.humanTacticSelection.add(cid);
   }
   else if(a==='toggle-auto' && game.mode==='auto'){
     game.autoPaused=!game.autoPaused;

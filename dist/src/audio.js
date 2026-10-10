@@ -43,13 +43,6 @@ export class DuelAudio{
   this.ctx=null;this.musicSource=null;this.musicSourceGain=null;this.musicSourcePhase=null;this.musicGain=null;
   this.active=false;this.paused=false;this.victoryHold=false;this.victoryToken=0;this.quietUntil=0;this.last={};
   this.introPrimed=false;this.musicPlayPending=null;
-  this.music.addEventListener('error',()=>{
-   const track=this.musicTracks[this.musicPhase];
-   if(track && track.url.endsWith('.ogg')){
-    track.url=new URL(`../assets/audio/${this.musicPhase}-8bit-v1.mp3`,import.meta.url).href;
-    this.music.src=track.url;this.resumeMusic();
-   }
-  });
   this.bindControls();
   document.addEventListener('visibilitychange',()=>{if(document.hidden)this.pauseMusic();else this.resumeMusic();});
   window.addEventListener('pagehide',()=>this.pauseMusic());
@@ -119,11 +112,7 @@ export class DuelAudio{
   const decode=url=>fetch(url).then(response=>{
    if(!response.ok)throw Error('Music load failed');return response.arrayBuffer();
   }).then(data=>this.ctx.decodeAudioData(data));
-  track.loading=decode(track.url).catch(error=>{
-   if(!track.url.endsWith('.ogg'))throw error;
-   track.url=new URL(`../assets/audio/${phase}-8bit-v1.mp3`,import.meta.url).href;
-   return decode(track.url);
-  }).then(buffer=>{track.buffer=buffer;track.loading=null;this.resumeMusic();})
+  track.loading=decode(track.url).then(buffer=>{track.buffer=buffer;track.loading=null;this.resumeMusic();})
    .catch(()=>{track.loading=null;track.failed=true;});
  }
  resumeMusic(){

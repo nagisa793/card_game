@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>DUEL ARENA | カードバトル</title>
-<link rel="stylesheet" href="./src/legacy.css?v=40"><link rel="stylesheet" href="./src/interface.css?v=89">
+<link rel="stylesheet" href="./src/legacy.css?v=40"><link rel="stylesheet" href="./src/interface.css?v=94">
 </head>
 <body>
 
@@ -69,7 +69,7 @@
           <li>罠カードを作戦エリアへ裏向きで伏せます。作戦エリアは5枠です。</li>
           <li>残ったメイン手札もすべて処理し、手札が0枚になったらスタンバイを終了します。</li>
         </ol>
-        <p class="rulesNote">戦術デッキの最初の手札も7枚です。対COMでは操作者が戦術デッキから好きな7枚を選び、残りをシャッフルします。</p>
+        <p class="rulesNote">戦術デッキから選ぶ最初の手札は、先攻が5枚、後攻が7枚です。後攻は先攻の盤面を見て、自分の初期メイン手札を引く前に選びます。先攻は後攻の盤面が完成した後に選びます。選ばなかった戦術カードはシャッフルします。</p>
       </section>
 
       <section class="rulesSection">
@@ -263,6 +263,6 @@
 
 <script type="importmap">{"imports":{"three":"./vendor/three.module.js"}}</script>
 <script src="./src/engine.js?v=90"></script>
-<script type="module" src="./src/boot.js?v=88"></script>
+<script type="module" src="./src/boot.js?v=100"></script>
 </body>
 </html>

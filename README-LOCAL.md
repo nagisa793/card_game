@@ -1,8 +1,8 @@
-# DUEL ARENA — version 88 完全コピー
+# DUEL ARENA — version 100 完全コピー
 
-公開版のソースコミット: 90bf5f57ccb3806a002778f74823fbab1b8da97a
+公開版のソースコミット: 0bf38dca79a2e28c0d813d099caeff6338e53f0c
 
-2026年10月7日時点のSites公開版と同じゲーム本体を収録しています。ゲーム本体は dist/ です。
+2026年10月11日時点のSites公開版と同じゲーム本体を収録しています。ゲーム本体は dist/ です。
 画像・音源・フォント・Three.js・ルール処理・テスト・素材生成スクリプトを含みます。
 この説明書と VERIFY-SHA256.json はGitHub用の補助ファイルです。
 

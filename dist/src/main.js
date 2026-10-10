@@ -1,7 +1,7 @@
-import {Arena} from './arena.js?v=76';
-import {SoftwareArena} from './software-arena.js?v=76';
-import {cardTexture,cardFaceReady} from './materials.js?v=85';
-import {DuelAudio} from './audio.js?v=80';
+import {Arena} from './arena.js?v=100';
+import {SoftwareArena} from './software-arena.js?v=100';
+import {cardTexture,cardFaceReady} from './materials.js?v=97';
+import {DuelAudio} from './audio.js?v=95';
 import {createDecisionUI} from './decision-ui.js?v=79';
 const $=id=>document.getElementById(id);
 function fitVisibleScreen(){

@@ -1,10 +1,7 @@
 import * as T from 'three';
 import {characterArt} from './character-art.js?v=32';
-const loader=new T.TextureLoader();
-function tex(url){const t=loader.load(new URL('../assets/'+url,import.meta.url).href);t.wrapS=t.wrapT=T.RepeatWrapping;t.anisotropy=4;return t;}
 export function palette(){
- const warm=tex('limestone.jpg'),cool=tex('slate.jpg'),bump=tex('stone-height.png');warm.colorSpace=cool.colorSpace=T.SRGBColorSpace;
- return {stone:new T.MeshStandardMaterial({map:warm,bumpMap:bump,bumpScale:.065,roughness:.87,color:0xc7c6ac}),slate:new T.MeshStandardMaterial({map:cool,bumpMap:bump,bumpScale:.06,roughness:.82}),dark:new T.MeshStandardMaterial({map:cool,bumpMap:bump,bumpScale:.09,roughness:.95,color:0x454d50}),gold:new T.MeshStandardMaterial({color:0xb5a274,metalness:.77,roughness:.34}),bronze:new T.MeshStandardMaterial({color:0x655a3c,metalness:.65,roughness:.55}),edge:new T.MeshStandardMaterial({color:0x1c252a,metalness:.5,roughness:.35}),soil:new T.MeshStandardMaterial({color:0x263c30,roughness:1}),leaf:new T.MeshStandardMaterial({color:0x4e6f48,roughness:.95,side:T.DoubleSide}),aqua:new T.MeshStandardMaterial({color:0x8ffff0,emissive:0x31c9c1,emissiveIntensity:1.4,metalness:.25,roughness:.13}),violet:new T.MeshStandardMaterial({color:0xc1b5ed,emissive:0x7762ba,emissiveIntensity:.7,metalness:.3,roughness:.18})};
+ return {gold:new T.MeshStandardMaterial({color:0xb5a274,metalness:.77,roughness:.34}),edge:new T.MeshStandardMaterial({color:0x1c252a,metalness:.5,roughness:.35})};
 }
 
 const FRONT={w:768,h:1076},BACK={w:768,h:1152};
@@ -22,7 +19,7 @@ for(const [name,file] of Object.entries({軍人A:'military-a',軍人B:'military-
 for(const sheet of Object.values(artSheets))loadImage(new URL(`../assets/illustrations/${sheet.file}.webp`,import.meta.url).href,img=>{
  (sheet.kinds||sheet.names).forEach((key,index)=>artImages.set(sheet.kinds?key:'named:'+key,{image:img,index,cols:sheet.cols,rows:sheet.rows}));
 });
-for(const [type,file] of Object.entries(frameFiles))loadImage(new URL(`../assets/card-frames/${file}.png`,import.meta.url).href,img=>{frameLayers.delete(type);frameImages.set(type,img);if(type==='back'){for(const texture of textureCache.values())if(texture.image.cardType==='back'){paintCard(texture.image,'back','');texture.needsUpdate=true;}resolveCardBackReady(true);}},()=>{if(type==='back')resolveCardBackReady(false);});
+for(const [type,file] of Object.entries(frameFiles))loadImage(new URL(`../assets/card-frames/${file}.webp`,import.meta.url).href,img=>{frameLayers.delete(type);frameImages.set(type,img);if(type==='back'){for(const texture of textureCache.values())if(texture.image.cardType==='back'){paintCard(texture.image,'back','');texture.needsUpdate=true;}resolveCardBackReady(true);}},()=>{if(type==='back')resolveCardBackReady(false);});
 const displayNames={growth:'進化Lv.1',rapidGrowth:'進化Lv.2',summon:'援軍',summonShuffleDraw:'援軍指名',draw2discard2:'手札入替',draw1:'手札交換',defensePrep:'地雷探知機',levelDown:'衰弱の刻印',lockZone:'侵された大地',reviveFromRetreat:'復活の狼煙',removePower1:'消えない裂傷',skipAttack:'被食者の復讐',forceEnd:'神の終止符',splitAttack:'引裂かれる想い',buff1:'士気高揚',debuff1:'威圧',redirect:'標的変更',revive:'戦線復帰',peek2:'偵察',drawTactic2:'作戦補給',buffAll1:'総力戦',debuffAll1:'一斉妨害',recycle:'作戦回収',negateTrap:'看破',strategyShift:'作戦転換',supportDefense:'援護防御',lastStand:'背水の陣'};
 function rounded(g,x,y,w,h,r){g.beginPath();g.roundRect(x,y,w,h,r);}
 function wrap(g,text,max){const out=[];let line='';for(const ch of text){if(g.measureText(line+ch).width>max&&line){out.push(line);line='';}line+=ch;}if(line)out.push(line);return out;}
