@@ -89,7 +89,7 @@ export class DuelAudio{
   const wasPaused=this.paused;
   this.paused=view.mode==='auto'&&!!view.autoPaused;
   if(this.paused){this.pauseMusic();}
-  const phase=!view.battlePhaseAnnounced&&['coinToss','standby','mulliganConfirm','awaitTacticSelection'].includes(view.state)?'standby':'battle';
+  const phase=this.holdBattleMusic||!view.battlePhaseAnnounced&&['coinToss','standby','mulliganConfirm','awaitTacticSelection'].includes(view.state)?'standby':'battle';
   if(phase===this.musicPhase){
    if((wasPaused&&!this.paused)||(this.active&&!this.paused&&this.musicPlayers[phase]?.paused&&!this.musicPlayPending))this.resumeMusic();
    return;

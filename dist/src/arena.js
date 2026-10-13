@@ -43,16 +43,29 @@ export class Arena {
   this.buildTargets();
   // This photograph-like render is the complete fixed scene. It is placed in
   // camera space so its artwork and the unchanged world-space hit zones align.
-  const image=new T.TextureLoader().load(new URL('../assets/arena-photoreal-v97.webp',import.meta.url).href);
+  const loader=new T.TextureLoader();
+  const image=loader.load(new URL('../assets/arena-photoreal-v97.webp',import.meta.url).href);
   image.colorSpace=T.SRGBColorSpace;image.anisotropy=this.renderer.capabilities.getMaxAnisotropy();
+  const panorama=loader.load(new URL('../assets/arena-panorama-v101.webp',import.meta.url).href);
+  panorama.colorSpace=T.SRGBColorSpace;panorama.anisotropy=this.renderer.capabilities.getMaxAnisotropy();
   const direction=this.camera.getWorldDirection(new T.Vector3());
+  // The panorama adds real scenery outside the 24.32-unit playfield. The
+  // original center stays at its exact size so card outlines and hit zones align.
+  const outer=new T.Mesh(new T.PlaneGeometry(38.4,16),new T.MeshBasicMaterial({map:panorama,color:0xd1d1d1,toneMapped:false,fog:false,depthWrite:true}));
+  outer.position.copy(this.camera.position).addScaledVector(direction,61);
+  outer.quaternion.copy(this.camera.quaternion);outer.frustumCulled=false;this.fixed.add(outer);
   // Compensate for the WebGL background pass so the displayed scene keeps the
   // restrained brightness of the original artwork. This affects no cards/HUD.
-  const backdrop=new T.Mesh(new T.PlaneGeometry(24.32,15.2),new T.MeshBasicMaterial({map:image,color:0xd1d1d1,toneMapped:false,fog:false,depthWrite:true}));
+  const centerMaterial=new T.MeshBasicMaterial({map:image,color:0xd1d1d1,toneMapped:false,fog:false,transparent:true,depthWrite:false});
+  centerMaterial.onBeforeCompile=shader=>{
+   shader.fragmentShader=shader.fragmentShader.replace('#include <map_fragment>',`#include <map_fragment>
+    diffuseColor.a *= smoothstep(0.0, 0.045, vMapUv.x) * smoothstep(0.0, 0.045, 1.0 - vMapUv.x);`);
+  };
+  const backdrop=new T.Mesh(new T.PlaneGeometry(24.32,15.2),centerMaterial);
   backdrop.position.copy(this.camera.position).addScaledVector(direction,60);
   backdrop.quaternion.copy(this.camera.quaternion);backdrop.frustumCulled=false;this.fixed.add(backdrop);
-  const surround=new T.Mesh(new T.PlaneGeometry(40,26),new T.MeshBasicMaterial({color:0x142423,toneMapped:false,fog:false,depthWrite:true}));
-  surround.position.copy(this.camera.position).addScaledVector(direction,61);
+  const surround=new T.Mesh(new T.PlaneGeometry(80,50),new T.MeshBasicMaterial({color:0x142423,toneMapped:false,fog:false,depthWrite:true}));
+  surround.position.copy(this.camera.position).addScaledVector(direction,62);
   surround.quaternion.copy(this.camera.quaternion);surround.frustumCulled=false;this.fixed.add(surround);
  }
  buildTargets(){

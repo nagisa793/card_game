@@ -1,7 +1,7 @@
 import {renderAttackArrows as drawAttackArrows} from './attack-arrows.js?v=54';
 import {renderBoardTargets,SLOT_WIDTH,SLOT_DEPTH} from './board-targets.js?v=2';
 import * as T from 'three';
-import {Arena} from './arena.js?v=100';
+import {Arena} from './arena.js?v=101';
 import {palette,cardTexture} from './materials.js?v=97';
 
 // Canvas fallback uses the same fixed artwork and unchanged board hit zones.
@@ -27,6 +27,9 @@ export class SoftwareArena {
   this.arenaImage=new Image();this.arenaImage.onload=()=>{this.background=null;this.invalidate();};
   this.arenaImage.onerror=()=>{this.background=null;this.invalidate();};
   this.arenaImage.src=new URL('../assets/arena-photoreal-v97.webp',import.meta.url).href;
+  this.panoramaImage=new Image();this.panoramaImage.onload=()=>{this.background=null;this.invalidate();};
+  this.panoramaImage.onerror=()=>{this.background=null;this.invalidate();};
+  this.panoramaImage.src=new URL('../assets/arena-panorama-v101.webp',import.meta.url).href;
   this.resize();this.observer=new ResizeObserver(()=>this.resize());this.observer.observe(canvas.parentElement);
   canvas.addEventListener('pointermove',e=>this.pick(e,false));
   canvas.addEventListener('pointerleave',()=>{this.pointerInside=false;this.pointerEvent=null;this.hover=null;this.hoverPile=null;this.hoverSlot=null;this.onCardHover?.(null);canvas.style.cursor='default';this.invalidate();});
@@ -64,9 +67,19 @@ export class SoftwareArena {
  renderBackground(){
   const layer=document.createElement('canvas');layer.width=this.canvas.width;layer.height=this.canvas.height;
   const g=layer.getContext('2d');g.scale(this.scale,this.scale);g.fillStyle='#182a2b';g.fillRect(0,0,this.width,this.height);
+  if(this.panoramaImage.complete&&this.panoramaImage.naturalWidth){
+   const w=this.width*38.4/(this.camera.right-this.camera.left),h=this.height*16/(this.camera.top-this.camera.bottom);
+   g.drawImage(this.panoramaImage,(this.width-w)/2,(this.height-h)/2,w,h);
+  }
   if(this.arenaImage.complete&&this.arenaImage.naturalWidth){
    const w=this.width*24.32/(this.camera.right-this.camera.left),h=this.height*15.2/(this.camera.top-this.camera.bottom);
-   g.drawImage(this.arenaImage,(this.width-w)/2,(this.height-h)/2,w,h);
+   const center=document.createElement('canvas');center.width=this.arenaImage.naturalWidth;center.height=this.arenaImage.naturalHeight;
+   const cg=center.getContext('2d');cg.drawImage(this.arenaImage,0,0);
+   cg.globalCompositeOperation='destination-in';
+   const fade=cg.createLinearGradient(0,0,center.width,0);
+   fade.addColorStop(0,'#0000');fade.addColorStop(.045,'#000');fade.addColorStop(.955,'#000');fade.addColorStop(1,'#0000');
+   cg.fillStyle=fade;cg.fillRect(0,0,center.width,center.height);
+   g.drawImage(center,(this.width-w)/2,(this.height-h)/2,w,h);
   }
   this.background=layer;
  }
@@ -134,7 +147,7 @@ export class SoftwareArena {
   if(pile&&click){window.dispatchEvent(new CustomEvent('duel:pile-select',{detail:pile}));const names={MainDeck:'メインデッキ',TacticDeck:'戦術デッキ',Exclusion:'除外エリア',Retreat:'撤退エリア'};const count=document.querySelector('#'+pile.side+pile.suffix+' .pileCount')?.textContent||'0枚';document.getElementById('inspectorName').textContent=(pile.side==='own'?'自分':'相手')+'の'+names[pile.suffix];document.getElementById('inspectorEffect').textContent='カード '+count;}
  }
  invalidate(duration=0){this.animatingUntil=Math.max(this.animatingUntil||0,performance.now()+duration);if(!this.frame)this.frame=requestAnimationFrame(()=>this.loop());}
- loop(){this.frame=0;if(document.hidden)return;if(!this.background)this.renderBackground();const g=this.ctx;g.setTransform(1,0,0,1,0,0);g.drawImage(this.background,0,0);if(this.resolveBackgroundReady&&(this.arenaImage.complete&&this.arenaImage.naturalWidth||this.arenaImage.complete&&this.arenaImage.naturalWidth===0)){this.resolveBackgroundReady();this.resolveBackgroundReady=null;}
+ loop(){this.frame=0;if(document.hidden)return;if(!this.background)this.renderBackground();const g=this.ctx;g.setTransform(1,0,0,1,0,0);g.drawImage(this.background,0,0);if(this.resolveBackgroundReady&&this.arenaImage.complete&&this.panoramaImage.complete){this.resolveBackgroundReady();this.resolveBackgroundReady=null;}
   g.save();g.scale(this.scale,this.scale);
   const attack=document.querySelector('.half.attackingSide');if(attack){const own=document.getElementById('ownHalf').classList.contains('attackingSide'),z=own?3.55:-3.55,p=this.project(0,.45,z);g.fillStyle='#dde9e918';g.fillRect(p[0]-this.width*.24,p[1]-this.height*.19,this.width*.48,this.height*.38);}
   for(const slot of this.slots){const node=slot.userData.node;if(!node||node.classList.contains('empty')||node.classList.contains('locked'))continue;

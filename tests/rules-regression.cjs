@@ -7,6 +7,8 @@ const api=['newPlayer','card','cardDisplayName','choice','clearChoice','render',
 let src=fs.readFileSync(root+'/src/engine.js','utf8').replace("var game = null;","var game = null;var testBulk=false;")
 .replace('function render(){','function render(){if(testBulk)return;')
 .replace('function log(text, cls){','function log(text, cls){if(testBulk)return;')
+.replace('function drawOpeningTactics(p){','function drawOpeningTactics(p){if(window.openingSelectionTrace)window.openingSelectionTrace.push({key:playerKey(p),mainDealt:p.openingMainDealt,hand:p.mainHand.length,firstDone:playerByKey(game.firstKey).standbyComplete,otherDone:other(playerByKey(game.firstKey)).standbyComplete});')
+.replace('p.tacticHand=ranked.slice(0,openingTacticCount(p));','p.tacticHand=ranked.slice(0,openingTacticCount(p));if(window.openingSelectionTrace)window.openingSelectionTrace.at(-1).count=p.tacticHand.length;')
 .replace('function applyQueuedEffect(entry){','function applyQueuedEffect(entry){window.effectCoverage[entry.kind]=(window.effectCoverage[entry.kind]||0)+1;')
 .replace('window.DuelEngine=Object.freeze({',`window.test={${api.join(',')},get:()=>game,set:g=>{game=g;clearChoice();},bulk:x=>{testBulk=x;},handoff:x=>{confirmHandsOff=x;},reset:()=>{match.scoreA=match.scoreB=0;startupPending=true;}};window.DuelEngine=Object.freeze({`);
 w.effectCoverage={};w.eval(src);const t=w.test;w.DuelEngine.setStartupPending(true);
@@ -84,10 +86,10 @@ for(const count of [0,1,2,5]){const g=scenario();g.state='resolving';g.B.tacticH
 console.log('PASS UI: scouting 0/1/2/5 cards; choice, reveal, acknowledge and resume');
 // Short discard label and exactly two deck buttons.
 {t.startGame('com','A');w.DuelEngine.prepareInitialHand();const g=t.get();g.state='standby';g.standbyKey='A';t.choice().standbyCard=g.A.mainHand[0].cid;paint();assert.equal(d.querySelector('#deckActions [data-action="discard-standby"]').textContent,'捨てる');assert.equal(d.querySelector('#deckActions').children.length,2);const n=d.querySelector('#deckActions').children.length;ui.sync();assert.equal(d.querySelector('#deckActions').children.length,n);}
-// Battle banner waits for both standby completions and confirmation of the human's seven tactics.
+// Battle banner waits for both standby completions and the first player's five tactics.
 for(const chosenBeforeStandby of [false,true]){
  const g=scenario();g.state='standby';g.standbyKey='B';g.A.mainHand=[];g.B.mainHand=[];g.A.standbyComplete=true;g.B.standbyComplete=false;g.humanTacticsReady=false;
- g.A.tacticDeck=Array.from({length:7},()=>t.card('tactic',{kind:'buff1'}));g.humanTacticSelection=new w.Set(g.A.tacticDeck.map(x=>x.cid));
+ g.A.tacticDeck=Array.from({length:5},()=>t.card('tactic',{kind:'buff1'}));g.humanTacticSelection=new w.Set(g.A.tacticDeck.map(x=>x.cid));
  let seen=0;const listen=()=>{seen++;assert(g.A.standbyComplete&&g.B.standbyComplete&&g.humanTacticsReady);};w.addEventListener('duel:battle-phase',listen);
  if(chosenBeforeStandby){t.completeHumanTacticSelection();assert.equal(seen,0);}
  t.finishStandby();assert.equal(seen,chosenBeforeStandby?1:0);
@@ -95,6 +97,18 @@ for(const chosenBeforeStandby of [false,true]){
  assert.equal(g.state,'turnDraw');t.beginTurn(g.B);assert.equal(seen,1);w.removeEventListener('duel:battle-phase',listen);
 }
 console.log('PASS UI: battle banner waits for tactic confirmation in both selection orders');
+for(const firstKey of ['A','B']){
+ t.reset();t.startGame('com',firstKey);const g=t.get(),limit=firstKey==='A'?5:7;
+ g.state='awaitTacticSelection';g.pendingSetupAction=null;
+ paint();assert(d.querySelector('#selectionPanelTitle').textContent.includes(limit+'枚選択'));
+ t.autoSelectOpeningTactics();
+ assert.equal(g.humanTacticSelection.size,limit);
+ paint();assert(d.querySelector('#deckActions [data-action="confirm-opening-tactics"]:not(:disabled)'),`confirmation for ${limit} tactics`);
+ t.completeHumanTacticSelection(true);
+ assert.equal(g.A.tacticHand.length,limit);
+ assert.equal(g.A.tacticDrawPool.length,20-limit);
+}
+console.log('PASS opening tactics UI: five for first, seven for second');
 // Battle choices use the existing hand/board or the visual retreat panel.
 for(const [mode,actorKey] of [['com','A']])for(const kind of ['revive','reviveFromRetreat','recycle','strategyShift','buff1','debuff1','levelDown','redirect','namedShift','splitAttack','supportDefense','removePower1','lockZone']){
  const g=scenario();g.mode=mode;g.responseActorKey=actorKey;g.state='response';const p=g[actorKey],op=g[actorKey==='A'?'B':'A'];
@@ -219,7 +233,7 @@ console.log(`PASS targeted: ${targeted} card/legality cases, ${battles} combat c
 // COM uses its actual production decision policy. Rendering is omitted in this batch only.
 function invariant(g,seed,step){for(const key of ['A','B']){const p=g[key],zones=['mainDeck','mainHand','tacticDeck','tacticDrawPool','tacticHand','battleArea','trapZone','tempPlayed','retreat','exclusion'];const all=zones.flatMap(z=>p[z]);assert.equal(all.length,60,`conservation ${seed}/${step}/${key}`);assert.equal(all.filter(x=>x.type==='tactic').length,20);const ids=all.filter(x=>x.cid!=null).map(x=>x.cid);assert.equal(new Set(ids).size,ids.length,'duplicate card');assert(p.battleArea.length<=5);assert.equal(new Set(p.battleArea.map(x=>x.battleSlot)).size,p.battleArea.length);assert(p.trapZone.length+p.tempPlayed.length+p.lockedSlotIndexes.length<=5);assert.equal(new Set(p.trapZone.concat(p.tempPlayed).map(x=>x.zoneSlot)).size,p.trapZone.length+p.tempPlayed.length);if(g.state==='turnDraw')for(const c of p.battleArea)assert(c.level>0&&c.level<=5);}}
 let totalSteps=0,maxSteps=0,scouts=0;
-for(let seed=1;seed<=500;seed++){let rng=seed;w.Math.random=()=>((rng=(Math.imul(rng,1664525)+1013904223)>>>0)/4294967296);t.reset();t.startGame('com',seed%2?'A':'B');let step=0;
+for(let seed=1;seed<=500;seed++){let rng=seed;w.Math.random=()=>((rng=(Math.imul(rng,1664525)+1013904223)>>>0)/4294967296);w.openingSelectionTrace=[];t.reset();t.startGame('com',seed%2?'A':'B');let step=0;
  for(;step<2000;step++){const g=t.get();if(['gameOver','matchOver'].includes(g.state))break;
   if(g.state==='awaitTacticSelection'){t.autoSelectOpeningTactics();t.completeHumanTacticSelection();}
   else if(g.state==='resolving'&&(g.attack.pendingPeekIndex!=null||g.attack.pendingPeekAcknowledgementIndex!=null)){const atk=g.attack,idx=atk.pendingPeekIndex??atk.pendingPeekAcknowledgementIndex;if(atk.chainHistory[idx].actorKey==='A'){if(atk.pendingPeekIndex!=null){t.choice().effect=new w.Set(g.B.tacticHand.slice(0,2).map(x=>x.cid));t.resolvePeekSelection();scouts++;}else t.acknowledgePeek();}else t.runComStep();}
@@ -228,8 +242,41 @@ for(let seed=1;seed<=500;seed++){let rng=seed;w.Math.random=()=>((rng=(Math.imul
   invariant(t.get(),seed,step);
  }
  assert(step<2000,`stalled game seed ${seed}, state ${t.get().state}`);totalSteps+=step;maxSteps=Math.max(maxSteps,step);
+ const comChoice=w.openingSelectionTrace.filter(x=>x.key==='B');
+ assert.equal(comChoice.length,1,`COM opening selection count, seed ${seed}`);
+ assert.equal(comChoice[0].firstDone,true);
+ assert.equal(comChoice[0].otherDone,seed%2===0,`COM must wait for both fields when first, seed ${seed}`);
+ assert.equal(comChoice[0].mainDealt,seed%2===0,`COM must choose before own opening draw when second, seed ${seed}`);
+ assert.equal(comChoice[0].count,seed%2===0?5:7,`COM hand size by order, seed ${seed}`);
+ if(seed%2)assert.equal(comChoice[0].hand,0);
  if(seed%100===0)console.log(`PASS ${seed}/500 games`);
 }
+// COM spectators select in human match order: second before their first main draw,
+// then first after both fields are built. Run both assignments of A/B to first.
+for(const firstKey of ['A','B']){
+ w.openingSelectionTrace=[];
+ t.reset();t.startGame('auto',firstKey);
+ let g=t.get(),first=g[firstKey],second=g[firstKey==='A'?'B':'A'];
+ assert(!first.openingTacticsReady&&!second.openingTacticsReady);
+ let step=0;
+ while(!first.standbyComplete&&step++<300){t.runComStep();}
+ assert(step<300,`first standby stalled: ${firstKey}`);
+ assert(second.openingTacticsReady,'second must select after observing first field');
+ assert.equal(second.tacticHand.length,7);
+ assert.deepEqual(Array.from(w.openingSelectionTrace,x=>[x.key,x.mainDealt,x.hand,x.firstDone,x.otherDone]),[[firstKey==='A'?'B':'A',false,0,true,false]],'second must select before their own main draw');
+ assert.equal(w.openingSelectionTrace[0].count,7);
+ assert(!first.openingTacticsReady,'first must wait until second field is built');
+ while(!second.standbyComplete&&step++<600){t.runComStep();}
+ assert(step<600,`second standby stalled: ${firstKey}`);
+ assert(first.openingTacticsReady&&second.tacticSelected&&first.tacticSelected);
+ assert.equal(first.tacticHand.length,5);
+ assert.deepEqual(Array.from(w.openingSelectionTrace,x=>[x.key,x.mainDealt,x.firstDone,x.otherDone]),[[firstKey==='A'?'B':'A',false,true,false],[firstKey,true,true,true]]);
+ assert.equal(w.openingSelectionTrace[1].count,5);
+ assert(['turnDraw','attackDeclare'].includes(g.state),'combat begins only after both selections');
+ invariant(g,'opening'+firstKey,step);
+}
+w.openingSelectionTrace=null;
+console.log('PASS spectator setup order: second selects before opening draw, first after both fields');
 // COM spectators: both sides advance automatically through reinforcement choices and resolution.
 for(let seed=1;seed<=100;seed++){let rng=seed+9000;w.Math.random=()=>((rng=(Math.imul(rng,1664525)+1013904223)>>>0)/4294967296);t.reset();t.startGame('auto',seed%2?'A':'B');let step=0;for(;step<2000;step++){const g=t.get();if(['gameOver','matchOver'].includes(g.state))break;t.runComStep();invariant(t.get(),'auto'+seed,step);}assert(step<2000,`auto mode stalled seed ${seed}, ${t.get().state}`);}console.log('PASS 100/100 COM spectator games');
 const report={games:500,totalSteps,maxSteps,humanScoutSelections:scouts,targetedCardCases:targeted,combatCases:battles,effectCoverage:w.effectCoverage};

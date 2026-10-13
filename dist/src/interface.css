@@ -276,7 +276,7 @@ footer{display:none!important;}
 .activeChainStack{display:none!important;}
 .activeFlowRail[hidden]{display:none!important;}
 #battleStage[data-game-state="awaitTacticSelection"] .activeFlowRail{display:none!important;}
-#gameStartOverlay.battlePhaseReveal{pointer-events:none;}
+#gameStartOverlay.battlePhaseReveal{pointer-events:auto;}
 
 /* Paper stock, printed borders, and a restrained hand fan. */
 #ownHand .card{position:relative;border:1px solid #29271f!important;border-radius:2px!important;outline:1px solid #c8b98f;outline-offset:-3px;box-shadow:0 1px 0 #b9a985,0 3px 0 #222b31,0 6px 10px #000b,inset 0 0 0 2px #fff8!important;transform:translateY(var(--hand-lift,0px)) rotate(var(--hand-angle,0deg));transform-origin:50% 112%;transition:transform .14s ease-out,box-shadow .14s ease-out;}

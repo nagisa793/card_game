@@ -1,7 +1,7 @@
-import {Arena} from './arena.js?v=100';
-import {SoftwareArena} from './software-arena.js?v=100';
+import {Arena} from './arena.js?v=101';
+import {SoftwareArena} from './software-arena.js?v=101';
 import {cardTexture,cardFaceReady} from './materials.js?v=97';
-import {DuelAudio} from './audio.js?v=95';
+import {DuelAudio} from './audio.js?v=101';
 import {createDecisionUI} from './decision-ui.js?v=79';
 const $=id=>document.getElementById(id);
 function fitVisibleScreen(){
@@ -222,10 +222,23 @@ for(const id of ['ownHand','oppHand','ownSelectedTacticHand'])new MutationObserv
 for(const id of ['ownBattle','oppBattle'])new MutationObserver(()=>{arena?.rebindHoverAfterDomUpdate();schedule();}).observe($(id),{subtree:true,childList:true,attributes:true,attributeFilter:['class']});
 const startOverlay=$('gameStartOverlay'),startTitle=$('gameStartTitle'),startOrder=$('gameStartOrder'),startLoading=$('gameStartLoading');
 function showBattlePhase(){
- sound.syncPhase({...window.DuelEngine.view(),battlePhaseAnnounced:true});
- const token=++battlePhaseSequence;startTitle.textContent='BATTLE PHASE';startTitle.hidden=false;startOrder.hidden=true;startLoading.hidden=true;
+ const token=++battlePhaseSequence;
+ window.DuelEngine.setStartupPending(true);sound.holdBattleMusic=true;
+ startTitle.textContent='STANDBY PHASE END';startTitle.hidden=false;startOrder.hidden=true;startLoading.hidden=true;
  startOverlay.hidden=false;startOverlay.classList.remove('boardReveal');startOverlay.classList.add('phaseReveal','battlePhaseReveal');
- setTimeout(()=>{if(token!==battlePhaseSequence)return;startOverlay.hidden=true;startOverlay.classList.remove('phaseReveal','battlePhaseReveal');},PHASE_DISPLAY_MS);
+ (async()=>{
+  await wait(PHASE_DISPLAY_MS);
+  if(token!==battlePhaseSequence)return;
+  startTitle.hidden=true;
+  await wait(500);
+  if(token!==battlePhaseSequence)return;
+  startTitle.textContent='BATTLE PHASE';startTitle.hidden=false;
+  sound.holdBattleMusic=false;sound.syncPhase(window.DuelEngine.view());
+  await wait(PHASE_DISPLAY_MS);
+  if(token!==battlePhaseSequence)return;
+  startOverlay.hidden=true;startOverlay.classList.remove('phaseReveal','battlePhaseReveal');
+  window.DuelEngine.setStartupPending(false);
+ })().catch(error=>{console.error('Battle phase transition failed',error);if(token===battlePhaseSequence){startOverlay.hidden=true;sound.holdBattleMusic=false;window.DuelEngine.setStartupPending(false);}});
 }
 document.body.append(startOverlay);
 window.addEventListener('duel:battle-phase',showBattlePhase);
@@ -269,10 +282,11 @@ async function startWithIntro(mode){
  const current=window.DuelEngine.view();
  if(current&&current.state!=='matchOver'&&!window.confirm('進行中の対戦を破棄して最初からやり直しますか？'))return;
  startingGame=true;
+ ++battlePhaseSequence;sound.holdBattleMusic=false;
  const firstKey=Math.random()<0.5?'A':'B';
  const playerName=key=>mode==='com'?(key==='A'?'あなた':'COM'):`COM ${key}`;
  pinnedCard=null;hoveredCard=null;showCardPreview();
- startOverlay.hidden=false;startOverlay.classList.remove('boardReveal','phaseReveal');document.body.classList.add('gameStarting');
+ startOverlay.hidden=false;startOverlay.classList.remove('boardReveal','phaseReveal','battlePhaseReveal');document.body.classList.add('gameStarting');
  startTitle.textContent='GAME START';startTitle.hidden=false;
  startOrder.textContent=`先攻：${playerName(firstKey)}　／　後攻：${playerName(firstKey==='A'?'B':'A')}`;startOrder.hidden=false;
  startLoading.textContent='盤面を準備中…';startLoading.hidden=false;
