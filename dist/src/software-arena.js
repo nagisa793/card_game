@@ -1,7 +1,7 @@
 import {renderAttackArrows as drawAttackArrows} from './attack-arrows.js?v=54';
 import {renderBoardTargets,SLOT_WIDTH,SLOT_DEPTH} from './board-targets.js?v=2';
 import * as T from 'three';
-import {Arena} from './arena.js?v=101';
+import {Arena} from './arena.js?v=102';
 import {palette,cardTexture} from './materials.js?v=97';
 
 // Canvas fallback uses the same fixed artwork and unchanged board hit zones.
@@ -116,8 +116,17 @@ export class SoftwareArena {
    const base=Number(node.dataset.basePower),mod=Number(node.dataset.tempMod);
    if(base===0)badge.classList.add('baseZero');
    const current=document.createElement('span');current.className='arenaCurrentPower';current.textContent=(node.querySelector('.powerValue')?.textContent||'Lv. 1').replace(/^Lv\.?\s*/,'Lv. ');badge.append(current);
-   if(node.dataset.tempActive==='true'){const detail=document.createElement('span');detail.className='arenaBasePower';detail.textContent='元Lv. '+base+' ／ 一時'+(mod>0?'+':mod===0?'±':'')+mod;badge.append(detail);}
+   if(node.dataset.tempActive==='true'){
+    const detail=document.createElement('span');detail.className='arenaBasePower';
+    const original=document.createElement('span'),temporary=document.createElement('span');
+    original.textContent='元Lv.'+base;temporary.textContent='一時 '+(mod>0?'+':mod===0?'±':'')+mod;
+    detail.append(original,temporary);
+    const nearest=this.slots.filter(peer=>peer!==slot&&peer.userData.id===slot.userData.id).reduce((gap,peer)=>Math.min(gap,Math.abs(this.project(peer.position.x,.51,peer.position.z)[0]-p[0])),Infinity);
+    detail.style.maxWidth=Math.max(30,Math.floor(nearest-8))+'px';badge.append(detail);
+   }
    badge.style.left=p[0]+'px';badge.style.top=p[1]+'px';this.labels.append(badge);
+   const detail=badge.querySelector('.arenaBasePower');
+   if(detail){const longest=Math.max(...[...detail.children].map(line=>line.scrollWidth));if(longest>detail.clientWidth){const size=parseFloat(getComputedStyle(detail).fontSize);detail.style.fontSize=Math.max(7,size*detail.clientWidth/longest)+'px';}}
   }
  }
  renderAttackArrows(){drawAttackArrows(this.labels,this.slots,(x,y,z)=>this.project(x,y,z),this.width,this.height);}

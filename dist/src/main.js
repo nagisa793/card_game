@@ -1,5 +1,5 @@
-import {Arena} from './arena.js?v=101';
-import {SoftwareArena} from './software-arena.js?v=101';
+import {Arena} from './arena.js?v=102';
+import {SoftwareArena} from './software-arena.js?v=102';
 import {cardTexture,cardFaceReady} from './materials.js?v=97';
 import {DuelAudio} from './audio.js?v=101';
 import {createDecisionUI} from './decision-ui.js?v=79';

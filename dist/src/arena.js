@@ -165,7 +165,10 @@ export class Arena {
    const current=document.createElement('span');current.className='arenaCurrentPower';current.textContent=level.replace(/^Lv\.?\s*/, 'Lv. ');badge.append(current);
    if(node.dataset.tempActive==='true'){
     const detail=document.createElement('span');detail.className='arenaBasePower';
-    detail.textContent='元Lv.'+base+' / 一時'+(mod>0?'+':mod===0?'±':'')+mod;
+    const original=document.createElement('span'),temporary=document.createElement('span');
+    original.textContent='元Lv.'+base;
+    temporary.textContent='一時 '+(mod>0?'+':mod===0?'±':'')+mod;
+    detail.append(original,temporary);
     const centerX=(p.x+1)*w/2;
     const nearest=this.slots.filter(peer=>peer!==slot&&peer.userData.id===slot.userData.id).reduce((gap,peer)=>{
      const projected=new T.Vector3(peer.position.x,.51,peer.position.z).project(this.camera);
@@ -176,9 +179,10 @@ export class Arena {
    }
    badge.style.left=((p.x+1)*w/2)+'px';badge.style.top=((1-p.y)*h/2)+'px';this.labels.append(badge);
    const detail=badge.querySelector('.arenaBasePower');
-   if(detail&&detail.scrollWidth>detail.clientWidth){
+   const longest=detail&&Math.max(...[...detail.children].map(line=>line.scrollWidth));
+   if(detail&&longest>detail.clientWidth){
     const currentSize=parseFloat(getComputedStyle(detail).fontSize);
-    detail.style.fontSize=Math.max(8,currentSize*detail.clientWidth/detail.scrollWidth)+'px';
+    detail.style.fontSize=Math.max(7,currentSize*detail.clientWidth/longest)+'px';
    }
   }
  }
